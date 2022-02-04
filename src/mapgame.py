@@ -3,16 +3,30 @@ import random
 from typing import List
 import time
 import math
-from curses import wrapper
+import curses
 
-from loguru import logger
 from colorama import Fore, Back, Style
-# print(Fore.RED + 'some red text')
-# print(Back.GREEN + 'and with a green background')
-# print(Style.DIM + 'and in dim text')
-# print(Style.RESET_ALL)
-# print('back to normal now')
+# Utils.printline(self.stdscr, Fore.RED + 'some red text')
+# Utils.printline(self.stdscr, Back.GREEN + 'and with a green background')
+# Utils.printline(self.stdscr, Style.DIM + 'and in dim text')
+# Utils.printline(self.stdscr, Style.RESET_ALL)
+# Utils.printline(self.stdscr, 'back to normal now')
 
+import logging
+from rich.logging import RichHandler
+
+from terminal_tools import WindowManager
+
+logging.basicConfig(
+    level="NOTSET",
+    format= '[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s',
+    filename="mapgame.log",
+    datefmt="[%X]",
+    # handlers=[RichHandler(rich_tracebacks=True)]
+)
+
+logger = logging.getLogger(__name__)
+logger.info("\n________________\nInitialized mapgame logger")
 
 
 class Utils:
@@ -23,11 +37,55 @@ class Utils:
         # or style: `Style.DIM`, `Style.NORMAL`, `Style.BRIGHT`, `Style.RESET_ALL`
         # Fore: BLACK, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE, RESET.
         return color + text + Style.RESET_ALL
+    
+    @staticmethod
+    def get_input(scr, prompt = "> "):
+        scr.addstr(prompt)
+        # usr_input = input(prompt).lower()
+        # return usr_input
+        input_str = ''
+        while True:
+            c = scr.getkey()
+            # logger.debug(f"key: {c}; {type(c)}")
+            # logger.debug(c == '\n')
+            if c == curses.KEY_ENTER or c == '\n':  # KEY_ENTER doesn't seem to work but \n does
+                Utils.newline(scr)
+                scr.refresh()
+                return input_str.lower()
+            input_str += c
+        input = sc.getstr(r + 1, c, 20)
+        return input  #       ^^^^  reading input at next line
+    
+    @staticmethod
+    def printline(scr, text):
+        scr.addstr(text)
+        Utils.newline(scr)
+        scr.refresh()
+
+    @staticmethod
+    def newline(scr):
+        y, x = scr.getyx()
+        try:
+            scr.move(y+1, 0)
+        except:
+            scr.scroll(1)
+            scr.move(y, 0)
+            # logger.exception(f"tried to move to y = {y + 1}")
+    
+    @staticmethod
+    def print_spaces(scr, num):
+        y, x = scr.getyx()
+        try:
+            scr.move(y, x + num)
+        except Exception as e:
+            logger.exception(f"tried to move to x = {x + num}")
+            raise e
 
 INVALID_INPUT_MSG = Utils.color_string("Input not understood", Style.DIM)
 
 class LivingThing:
-    def __init__(self):
+    def __init__(self, wm):
+        self.wm = wm
         self.is_dead = False
         self.max_hp = 20
         self.hp = self.max_hp
@@ -39,12 +97,12 @@ class LivingThing:
     
     def _heal_over_time(self):
         if self.hp < 20:
-            print("This living thing is healing over time")
+            Utils.printline(self.wm.stdscr, "This living thing is healing over time")
             self.hp += 1
 
     def move(self, tile, direction):
         if not tile.check_move(self.x, self.y, direction):
-            print(f"There is no path {direction}")
+            logger.debug(self.wm.stdscr, f"Living thing attempted to move {direction}; there is no path")
         elif direction == "n":
             self.y -= 1
             return True
@@ -58,23 +116,24 @@ class LivingThing:
             self.x -= 1
             return True
         else:
-            print("Invalid direction")
+            Utils.printline(self.wm.stdscr, "Invalid direction")
 
 
 class NPC(LivingThing):
-    def __init__(self, name: str):
-        super().__init__()
+    def __init__(self, wm, name: str):
+        super().__init__(wm)
         self.name = name
         self.max_hp = 30
         self.player_attitude = 0  # Attitude towards player - 0 is hostile; higher is better
         self.xp_reward = 0
         self.wander = True
+        self.is_dead = False
     
     @classmethod
-    def generate_from_level(cls, level: int):
-        print(f"Generating level {level} enemy")
-        name = random.choice(['slime', 'skeleton', 'reanimated corpse'])
-        inst = cls(name)
+    def generate_from_level(cls, wm, level: int):
+        logger.info(f"Generating level {level} enemy")
+        name = random.choice(['slime', 'skeleton', 'bad guy'])
+        inst = cls(wm, name)
         inst.max_hp = 20 + (level * 5)
         inst.hp = inst.max_hp
         inst.attack_power = 2 + level
@@ -82,10 +141,15 @@ class NPC(LivingThing):
         # inst.attack_type = random.choice(['ranged', 'melee'])
         return inst
     
+    def will_attack_player(self):
+        if not self.is_dead and self.player_attitude <= 0:
+            return True
+        return False
+    
     def _on_time_pass(self, tile):
         # TODO: not implemented
         if (self.x, self.y) in tile.chests:
-            print(f"NPC {self.name} opened a chest at {(self.x, self.y)}")
+            logger.debug(f"NPC {self.name} opened a chest at {(self.x, self.y)}")
             tile.chests.remove((self.x, self.y))
         elif self.wander:
             move_options = ['n', 's', 'e', 'w']
@@ -93,19 +157,23 @@ class NPC(LivingThing):
             mv_choice = move_options.pop()
             while not self.move(tile, mv_choice):  # try to move until it works
                 logger.debug("NPC tried to move to an invalid location; trying another way...")
-                mv_choice = move_options.pop()
-            logger.debug(f"{self.name} moved {mv_choice}")
+                try:
+                    mv_choice = move_options.pop()
+                except IndexError:
+                    logger.exception(f"NPC at {(self.x, self.y)} could not find a location to wander to!")
+                    return False
+            logger.debug(f"{self.name} moved {mv_choice} to {(self.x, self.y)}")
 
     def take_damage(self, dmg: int):
         self.hp -= dmg
         if self.hp <= 0:
-            print("It falls to the ground in a heap, then disappears in a flash of light!")
+            Utils.printline(self.wm.stdscr, "It falls to the ground in a heap, then disappears in a flash of light!")
             self.is_dead = True
 
 
 class Player(LivingThing):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, wm):
+        super().__init__(wm)
         self.max_hp = 50
         self.hp = self.max_hp
         self.attack_power = 5
@@ -116,26 +184,26 @@ class Player(LivingThing):
         self.humanity = 100  # out of 100
     
     def grant_xp(self, xp: int):
-        print(f"You gained {xp} XP!")
+        Utils.printline(self.wm.stdscr, f"You gained {xp} XP!")
         self.xp += xp
         if self.xp > (50 * self.level):
             lvl_txt = Utils.color_string(f"You have leveled up!", Fore.GREEN)
-            print(lvl_txt)
+            Utils.printline(self.wm.stdscr, lvl_txt)
             self.level += 1
-            print(f"You are now level {self.level}.")
+            Utils.printline(self.wm.stdscr, f"You are now level {self.level}.")
             ap_txt = Utils.color_string(f"attack power", Style.BRIGHT)
-            print(f"You gain 1 {ap_txt}!")
+            Utils.printline(self.wm.stdscr, f"You gain 1 {ap_txt}!")
     
     def take_damage(self, dmg: int):
         ouch = random.choice(['Ouch', 'Oof', 'Owwie', 'Yikes', 'Oh no'])
-        print(f"{ouch}! You take {dmg} damage!")
+        Utils.printline(self.wm.stdscr, f"{ouch}! You take {dmg} damage!")
         self.hp -= dmg
         if self.hp <= 0:
-            print("YOU DIE.")
-            print("Not really implemented yet; for now you lose 25 humanity")
+            Utils.printline(self.wm.stdscr, "YOU DIE.")
+            Utils.printline(self.wm.stdscr, "Not really implemented yet; for now you lose 25 humanity")
             self.humanity -= 25
             if self.humanity <= 0:
-                print("humanity <= 0; GAME OVER")
+                Utils.printline(self.wm.stdscr, "humanity <= 0; GAME OVER")
                 raise NotImplementedError('Game Over')
     
     def recover_hp(self, rec):
@@ -143,73 +211,81 @@ class Player(LivingThing):
         if hp_missing < rec:
             rec = hp_missing
         hp_txt = Utils.color_string(str(hp_missing), Fore.GREEN)
-        print(f"You recover {hp_txt} HP!")
+        Utils.printline(self.wm.stdscr, f"You recover {hp_txt} HP!")
         self.hp += rec
-        print(f"You are now at {self.hp}/{self.max_hp} HP!")
+        Utils.printline(self.wm.stdscr, f"You are now at {self.hp}/{self.max_hp} HP!")
 
     
     def _heal_over_time(self):
         super()._heal_over_time()
         if self.hp < self.max_hp:
-            print("The player heals twice as fast")
+            Utils.printline(self.wm.stdscr, "The player heals twice as fast")
             self.hp += 1
 
 
 class Game:
-    def __init__(self):
-        self.player = Player()
-        self.map = Map(8, 4)
+    def __init__(self, stdscr):
+        self.wm = WindowManager(stdscr)
+        self.player = Player(self.wm)
+        self.map = Map(self.wm, 8, 4)
         self.current_tile = self.map.tiles[0]  # self.map.tiles[self.player.tile_index]
         self.time = 0
         # self.x = 0
         # self.y = 0
         self.debug = True
+        self.play()
     
     def _progress_time(self):
         self.player._heal_over_time()
         self.time += 1
         self.current_tile.npc._on_time_pass(self.current_tile)
         # if random.randint(0, 9) == 0:
-        #     print("Random enemy encounter!!!!")
+        #     Utils.printline(self.wm.stdscr, "Random enemy encounter!!!!")
         #     enemy = NPC.generate_from_level(self.player.tile_index)
-        #     print(vars(enemy))
+        #     Utils.printline(self.wm.stdscr, vars(enemy))
         #     self.combat(enemy)
         #     # uinput = ''
         #     # while uinput.lower() != 'ok':
-        #     #     uinput = input("you gotta type ok to continue!")
+        #     #     the input abve won't work with curses, fix that when you uncomment
+        #     #     uinput = input(self.wm.stdscr, "you gotta type ok to continue!")
     
     def combat(self, hostile: NPC):
         in_combat = True
         enemy_text = Utils.color_string(f"{hostile.name}", Fore.RED)
-        print(f"Entered combat with a hostile {enemy_text}!")
+        Utils.newline(self.wm.stdscr)
+        Utils.printline(self.wm.stdscr, f"Entered combat with a hostile {enemy_text}!")
+        self.wm.mapscr.clear()
+        Utils.printline(self.wm.mapscr, 'COMBAT TIME >:I')
+        self.wm.mapscr.refresh()
         while in_combat:
             took_turn = False
-            print(f"{enemy_text.title()}: {hostile.hp}/{hostile.max_hp} HP")
-            print(f"You: {self.player.hp}/{self.player.max_hp} HP")
-            print(f"You can {Utils.color_string('melee', Fore.RED)} attack, or attempt to {Utils.color_string('run', Fore.CYAN)}.")
+            Utils.printline(self.wm.stdscr, f"{enemy_text.title()}: {hostile.hp}/{hostile.max_hp} HP")
+            Utils.printline(self.wm.stdscr, f"You: {self.player.hp}/{self.player.max_hp} HP")
+            Utils.printline(self.wm.stdscr, f"You can {Utils.color_string('melee', Fore.RED)} attack, or attempt to {Utils.color_string('run', Fore.CYAN)}.")
             try:
-                ui = input("> ").lower()
+                ui = Utils.get_input(self.wm.input_scr)
             except KeyboardInterrupt:
                 logger.warning("caught KeyboardInterrupt to break out of combat")
                 in_combat = False
                 continue
             if ui in ['melee', 'm']:
-                print("")
+                Utils.printline(self.wm.stdscr, "")
                 base_dmg = self.player.attack_power
                 min_dmg = int((base_dmg * 0.5) + 0.5)
                 max_dmg = int(base_dmg * 1.5)
                 act_dmg = random.randint(min_dmg, max_dmg)
-                print(f"You take a swing at the {enemy_text}!")
+                Utils.printline(self.wm.stdscr, f"You take a swing at the {enemy_text}!")
                 dmg_txt = Utils.color_string(f"{act_dmg} damage", Fore.RED)
-                print(f"You do ({min_dmg}-{max_dmg}) {dmg_txt}!")
+                Utils.printline(self.wm.stdscr, f"You do ({min_dmg}-{max_dmg}) {dmg_txt}!")
                 hostile.take_damage(act_dmg)
                 took_turn = True
             elif ui in ['run', 'r']:
-                print("")
-                print("You try to run but it doesn't work because it's not implemented yet!")
+                Utils.printline(self.wm.stdscr, "")
+                Utils.printline(self.wm.stdscr, "You run away!")
+                in_combat = False
                 took_turn = True
             else:
-                print(INVALID_INPUT_MSG)
+                Utils.printline(self.wm.stdscr, INVALID_INPUT_MSG)
             if took_turn and in_combat:
                 if hostile.hp <= 0:
                     logger.info("Ending combat because enemy is dead")
@@ -223,15 +299,15 @@ class Game:
                     min_dmg = int((base_dmg * 0.5) + 0.5)
                     max_dmg = int(base_dmg * 1.5)
                     act_dmg = random.randint(min_dmg, max_dmg)
-                    print(f"The {enemy_text} attacks you!")
+                    Utils.printline(self.wm.stdscr, f"The {enemy_text} attacks you!")
                     dmg_txt = Utils.color_string(f"{act_dmg} damage", Fore.RED)
-                    print(f"It connects for ({min_dmg}-{max_dmg}) {dmg_txt}!")
+                    Utils.printline(self.wm.stdscr, f"It connects for ({min_dmg}-{max_dmg}) {dmg_txt}!")
                     self.player.take_damage(act_dmg)
-                    print("")
+                    Utils.printline(self.wm.stdscr, "")
 
     def open_chest(self):
         self.current_tile.chests.remove((self.player.x, self.player.y))
-        print("You open a chest! There's nothing inside.")
+        Utils.printline(self.wm.stdscr, "You open a chest! There's nothing inside.")
         time.sleep(0.5)
 
     def portal_into_another_dimension(self, dim_num = None):
@@ -240,10 +316,10 @@ class Game:
         else:
             pass
         self.player.tile_index = dim_num
-        print(f"You portal into dimension #{dim_num}")
+        Utils.printline(self.wm.stdscr, f"You portal into dimension #{dim_num}")
         try:
             self.current_tile = self.map.tiles[dim_num]
-            print("This dimension already existed")
+            Utils.printline(self.wm.stdscr, "This dimension already existed")
         except IndexError:
             try:
                 self.map.tiles[dim_num-1]
@@ -251,7 +327,7 @@ class Game:
                 # TODO: autogenerate several map tiles
                 raise ex("Can't skip between multiple dimensions")
             Utils.color_string("This dimension needed to be generated", Style.BRIGHT)
-            new_tile = Tile(self.map.default_width, self.map.default_height)
+            new_tile = Tile(self.wm, self.map.default_width, self.map.default_height)
             self.map.tiles.append(new_tile)
             self.current_tile = new_tile
             self.player.grant_xp(dim_num * 2)
@@ -259,6 +335,7 @@ class Game:
             self.player.x, self.player.y = (0, 0)
 
     def map_turn(self):
+        # self.stdscr.clrtobot()
         if (self.player.x, self.player.y) in self.current_tile.rooms:
             room_name = self.current_tile.rooms[(self.player.x, self.player.y)]['name']
         else:
@@ -267,57 +344,69 @@ class Game:
         if ct_npc.is_dead:
             pass
         elif (ct_npc.x, ct_npc.y) == (self.player.x, self.player.y):
-            if ct_npc.player_attitude <= 0:
+            if ct_npc.will_attack_player():
                 self.combat(ct_npc)
             else:
-                print(f"There is a {ct_npc.name} in this room!")
-                print("Non-hostile NPC encounters not yet implemented.")
+                Utils.printline(self.wm.stdscr, f"There is a friendly {ct_npc.name} in this room!")
+                Utils.printline(self.wm.stdscr, "Non-hostile NPC encounters not yet implemented.")
         self.current_tile.print_map(self.player.x, self.player.y)
-        print("What direction do you want to move? [n/e/s/w] ")
+        Utils.printline(self.wm.stdscr, "What direction do you want to move? [n/e/s/w] ")
         # don't want any more lines so the map stays the same, use room_flavor_text instead
-        # if room_name == 'portal': print("You can leave through the portal in this room.")
-        command = input("> ").lower()
+        # if room_name == 'portal': Utils.printline(self.stdscr, "You can leave through the portal in this room.")
+        command = Utils.get_input(self.wm.input_scr)
+        Utils.newline(self.wm.stdscr)
         if command in ['n', 'e', 's', 'w']:
             if self.player.move(self.current_tile, command):  # move successful
-                print("You move in that direction.")
-                print("")
+                Utils.printline(self.wm.stdscr, "You move in that direction.")
+                Utils.newline(self.wm.stdscr)
                 self.current_tile.explored.add((self.player.x, self.player.y))
                 self.current_tile.room_flavor_text((self.player.x, self.player.y))
                 if (self.player.x, self.player.y) in self.current_tile.chests:
-                    print("There's a chest in this room!!!")
+                    Utils.printline(self.wm.stdscr, "There's a chest in this room! You wonder what's inside!")
                 self._progress_time()
                 # TODO: print flavor text for room
         elif room_name == 'portal' and command in ['portal', 'leave', 'take portal', 'p']:
-            print("You take the portal into the next dimension...")
+            self.wm.mapscr.clear()
+            Utils.printline(self.wm.stdscr, "You take the portal into the next dimension...")
             self.portal_into_another_dimension()
             return True  # don't loop
         elif (self.player.x, self.player.y) in self.current_tile.chests and command in ['open', 'chest', 'o']:
             self.open_chest()
         # beyond here lies debug commands
+        elif self.debug and command[:2] == 'ff':
+            self.combat(ct_npc)
         elif self.debug and command[:2] == 'xp':
             self.player.grant_xp(int(command[2:].strip()))
         elif self.debug and (command[:2] == 'tp' or command[:4] == 'tele'):
-            print('teleport to what coordinates? (i.e. "1, 3")')
-            print('remember y is inverted')
-            tc = input('> ')
+            Utils.printline(self.wm.stdscr, 'teleport to what coordinates? (i.e. "1, 3")')
+            Utils.printline(self.wm.stdscr, 'remember y is inverted')
+            tc = Utils.get_input(self.wm.input_scr)
             try:
                 tc = tuple(int(cv.strip()) for cv in tc.split(','))
             except:
-                print("invalid coordinates!")
+                Utils.printline(self.wm.stdscr, "invalid coordinates!")
                 return
             if self.current_tile._check_valid_coords(tc):
                 self.player.x, self.player.y = tc
                 self.current_tile.explored.add((self.player.x, self.player.y))
-                print('poof~')
+                Utils.printline(self.wm.stdscr, 'poof~')
             else:
-                print("off-map coordinates not allowed")
+                Utils.printline(self.wm.stdscr, "off-map coordinates not allowed")
         else:
-            print(INVALID_INPUT_MSG)
+            Utils.printline(self.wm.stdscr, INVALID_INPUT_MSG)
 
     def play(self):
+        # curses.resizeterm(20, 50)
+        self.wm.input_scr.keypad(True)
+        curses.echo()
+        # self.wm.stdscr.clear()  # Clear screen
+
+        
+        
         while True:
-            print("You are in the hub world. Go to 'map' or 'portal' pls.")
-            command = input("> ").lower()
+            Utils.printline(self.wm.stdscr, "You are in the hub world. Go to 'map' or 'portal' pls.")
+            # input_field.getch()
+            command = Utils.get_input(self.wm.input_scr)
             if command == 'map':
                 while not self.map_turn():  # loop until it returns True
                     pass # TODO: perhaps pass time here?
@@ -327,10 +416,11 @@ class Game:
 
 
 class Map:
-    def __init__(self, width, height):
+    def __init__(self, wm, width, height):
+        self.wm = wm
         self.default_height = height
         self.default_width = width
-        self.tiles = [Tile(width, height)]  # ordered list
+        self.tiles = [Tile(self.wm, width, height)]  # ordered list
 
 # class Coordinate:
 #     def __init__(self, x, y):
@@ -339,7 +429,8 @@ class Map:
 
 
 class Tile:
-    def __init__(self, width: int, height: int):
+    def __init__(self, wm, width: int, height: int):
+        self.wm = wm
         self.height = height
         self.width = width
         self.rooms = {
@@ -358,7 +449,7 @@ class Tile:
         self.explored = set([(0, 0)])  # had to put the tuple in a list to get it to turn into a set of tuples
         self.paths = self.generate_paths(self.width * self.height)
         self.all_visible = False
-        self.npc = NPC.generate_from_level(1)
+        self.npc = NPC.generate_from_level(self.wm, 1)
         self.npc.x, self.npc.y = self.gen_random_coordinates()
         logger.debug(f"NPC spawned at {(self.npc.x, self.npc.y)}")
     
@@ -391,27 +482,27 @@ class Tile:
     def room_flavor_text(self, room_coords):
         try:
             room_name = self.rooms[room_coords]['name']
-            print(f"You stand in the {room_name} room!")
+            Utils.printline(self.wm.stdscr, f"You stand in the {room_name} room!")
             if room_name == 'portal':
                 leave_txt = Utils.color_string(f"leave", Fore.MAGENTA)
                 portal_txt = Utils.color_string(f"leave", Style.BRIGHT)
-                print(f"You can {leave_txt} through the portal in this room.")
+                Utils.printline(self.wm.stdscr, f"You can {leave_txt} through the portal in this room.")
                 # TODO: cleared?
         except KeyError:
             # empty room
-            print(f"You stand in an empty room.")
+            Utils.printline(self.wm.stdscr, f"You stand in an empty room.")
 
 
     def generate_paths(self, n_paths: int):
         paths = []
-        print(f"Generating {n_paths} paths")
+        logger.info(f"Generating {n_paths} paths")
         n_attempts = 0
         while len(paths) < n_paths and n_attempts < (4 * n_paths):
             n_attempts += 1
             # choose starting square
             px1 = random.randint(0, self.width - 1)
             py1 = random.randint(0, self.height - 1)
-            # print(f"px1, py1 is {px1, py1}")
+            # Utils.printline(self.wm.stdscr, f"px1, py1 is {px1, py1}")
             if (px1, py1) == (self.width - 1, self.height - 1):
                 continue  # can't go anywhere from this corner
             px2 = px1
@@ -423,10 +514,10 @@ class Tile:
                 py2 = py1 + 1
             if py2 < self.height and px2 < self.width and ((px1, py1), (px2, py2)) not in paths:  # valid path
                 paths.append(((px1, py1), (px2, py2)))
-        # print(f"Generated {len(paths)} paths in {n_attempts} attempts")
+        # Utils.printline(self.wm.stdscr, f"Generated {len(paths)} paths in {n_attempts} attempts")
         island_nodes = self._nodes_on_this_island(0, 0, paths)
         while len(island_nodes) < self.width * self.height:
-            # print("Missing some connections")
+            # Utils.printline(self.wm.stdscr, "Missing some connections")
             adj_nodes = self._nodes_with_inaccessible_adjacencies(island_nodes)
             paths.append(self._resolve_inaccessible_tile(island_nodes, adj_nodes))
             island_nodes = self._nodes_on_this_island(0, 0, paths)
@@ -441,16 +532,16 @@ class Tile:
             for path_tup in paths:
                 if (x, y) == path_tup[0]:
                     if path_tup[1] not in found_nodes:
-                        # print(f'Identified connected node {path_tup[1]}')
+                        # Utils.printline(self.wm.stdscr, f'Identified connected node {path_tup[1]}')
                         found_nodes.append(path_tup[1])
                         coords_to_search.append(path_tup[1])
                 elif (x, y) == path_tup[1]:
                     if path_tup[0] not in found_nodes:
-                        # print(f'Identified connected node {path_tup[0]}')
+                        # Utils.printline(self.wm.stdscr, f'Identified connected node {path_tup[0]}')
                         found_nodes.append(path_tup[0])
                         coords_to_search.append(path_tup[0])
         assert coords_to_search == []
-        # print(f"len(found_nodes) is {len(found_nodes)} / {self.width * self.height}")
+        # Utils.printline(self.wm.stdscr, f"len(found_nodes) is {len(found_nodes)} / {self.width * self.height}")
         return found_nodes
 
     def _nodes_with_inaccessible_adjacencies(self, island_nodes: 'List(tuple)') -> 'List(tuple)':
@@ -481,14 +572,14 @@ class Tile:
 
     def _resolve_inaccessible_tile(self, island_nodes: list, adj_nodes: list):
         x, y = random.choice(adj_nodes)
-        # print(f'Chose random adjacent node at {x}, {y} to resolve path')
+        # Utils.printline(self.stdscr, f'Chose random adjacent node at {x}, {y} to resolve path')
         choices = [((x, y - 1), (x, y)), ((x, y), (x, y + 1)), ((x, y), (x + 1, y)), ((x - 1, y), (x, y))]
         valid_choice = False
         while not valid_choice:
             valid_choice = None
             rc = choices.pop(random.randint(0, len(choices) - 1))
-            # print(f'len(choices) is {len(choices)}')
-            # print(f'rc is {rc}')
+            # Utils.printline(self.stdscr, f'len(choices) is {len(choices)}')
+            # Utils.printline(self.stdscr, f'rc is {rc}')
             for c in rc: 
                 if not self._check_valid_coords(c):
                     valid_choice = False
@@ -497,7 +588,7 @@ class Tile:
                 continue
             elif (rc[0] not in island_nodes and rc[1] in island_nodes) or (rc[1] not in island_nodes and rc[0] in island_nodes):
                 # exactly one coordinate is to an island node
-                # print("this is a valid choice")
+                # Utils.printline(self.stdscr, "this is a valid choice")
                 valid_choice = rc
         return valid_choice
 
@@ -515,43 +606,52 @@ class Tile:
         return self._path_when_moving(x, y, direction) in self.paths
 
     def print_map(self, player_x, player_y):
+        self.wm.mapscr.clear()
+        Utils.newline(self.wm.mapscr)
         for y in range(0, self.height):
             # print the yth row of rooms
             for x in range(0, self.width):
                 if player_x == x and player_y == y:
-                    sys.stdout.write("[u]")  # this is the player's room
+                    self.wm.mapscr.addstr("[u]")  # this is the player's room
                 # elif (x, y) in self.rooms:
-                #     sys.stdout.write(self.rooms[(x, y)]['map_icon'])
+                #     self.wm.mapscr.addstr(self.rooms[(x, y)]['map_icon'])
                 elif (x, y) in self.explored:
                     if (x, y) in self.rooms:
-                        sys.stdout.write(self.rooms[(x, y)]['map_icon'])
+                        self.wm.mapscr.addstr(self.rooms[(x, y)]['map_icon'])
                     else:
-                        sys.stdout.write("[.]")  # explored, empty
+                        self.wm.mapscr.addstr("[.]")  # explored, empty
                 else:
-                    sys.stdout.write("[ ]")  # unexplored room
+                    self.wm.mapscr.addstr("[")  # unexplored room
+                    Utils.print_spaces(self.wm.mapscr, 1)
+                    self.wm.mapscr.addstr("]")  # unexplored room
                 # now see whether there's a path to the next room
                 c1 = (x, y)
                 c2 = (x + 1, y)
                 visible = self.all_visible or (c1 in self.explored or c2 in self.explored)
                 if (c1, c2) in self.paths and visible:
-                    sys.stdout.write("-")
+                    self.wm.mapscr.addstr("-")
                 else:
-                    sys.stdout.write(" ")
+                    # self.wm.mapscr.addstr(" ")
+                    Utils.print_spaces(self.wm.mapscr, 1)
             # now that we've written the rooms, draw paths to next row
-            print()  # newline
+            Utils.newline(self.wm.mapscr)  # newline
             for x in range(0, self.width):
-                sys.stdout.write(" ")  # spaces for above room
+                # self.wm.mapscr.addstr(" ")  # spaces for above room
+                Utils.print_spaces(self.wm.mapscr, 1)
                 c1 = (x, y)
                 c2 = (x, y + 1)
                 visible = self.all_visible or (c1 in self.explored or c2 in self.explored)
                 if (c1, c2) in self.paths and visible:
-                    sys.stdout.write("|  ")
+                    self.wm.mapscr.addstr("|  ")
                 else:
-                    sys.stdout.write("   ")
-            print()
+                    # self.wm.mapscr.addstr("   ")
+                    Utils.print_spaces(self.wm.mapscr, 3)
+            Utils.newline(self.wm.mapscr)
+            self.wm.mapscr.refresh()
 
 
-game = Game()
+# game = Game()
 # game._progress_time()
 # game.play()
-wrapper(game.play)
+# curses.wrapper(game.play)
+curses.wrapper(Game)
