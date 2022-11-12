@@ -2,11 +2,14 @@ import logging
 import random
 import time
 from rich.logging import RichHandler
-
+from textual.app import App, ComposeResult
+from textual.widgets import Header, Footer, Static, Input
 from mapgame_pieces.player import Player
 from mapgame_pieces.alive import NPC
 from mapgame_pieces.map import Map
 from mapgame_pieces.utils import color_string, print_stdscr, get_input, print_mapscr
+from textual.reactive import reactive
+from itertools import cycle
 
 logging.addLevelName(70, "MAP")
 logger = logging.getLogger(__name__)
@@ -20,8 +23,95 @@ class WindowManager:
     ...
 
 
+hellos = cycle(
+    [
+        "Hola",
+        "Bonjour",
+        "Guten tag",
+        "Salve",
+        "Nǐn hǎo",
+        "Olá",
+        "Asalaam alaikum",
+        "Konnichiwa",
+        "Anyoung haseyo",
+        "Zdravstvuyte",
+        "Hello",
+    ]
+)
+
+
+class Hello(Static):
+    """Display a greeting."""
+
+    DEFAULT_CSS = """
+    Hello {
+        padding: 1 2;
+        background: $panel;
+        border: $secondary tall;
+        content-align: center middle;
+    }
+    """
+
+    def on_mount(self) -> None:
+        self.next_word()
+
+    # def on_click(self) -> None:
+    #     self.next_word()
+
+    def next_word(self) -> None:
+        """Get a new hello and update the content area."""
+        hello = next(hellos)
+        self.update(f"{hello}, [b]World[/b]!")
+
+
+class OutputWindow(Static):
+    def add_line(self, new_content):
+        old_content = self.render()
+        # logger.debug("%s newlines in old content", str(old_content).count("\n"))
+        if str(old_content).count("\n") + 1 >= self.content_size.height:
+            # truncate content to give the appearance of scrolling
+            old_content = str(old_content).split("\n", 1)[1]
+        self.update(old_content + "\n" + new_content)
+
+        # logger.debug(self.content_size.height)
+
+
+class GUIWrapper(App):
+
+    BINDINGS = [("d", "toggle_dark", "Toggle dark mode")]
+    CSS_PATH = "horizontal_layout.css"
+
+    def __init__(self):
+        self.my_hello = Hello("Misc Info", classes="box")
+        self.main_out = OutputWindow("Main Output", classes="box", id="tallboi")
+        super().__init__()
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+        yield Footer()
+        # yield Welcome()
+        yield Static("Map", classes="box")
+        yield self.main_out
+        # yield Hello("Misc Info", classes="box")
+        yield self.my_hello
+        # yield Static("Input", classes="box", id="longboi")
+        yield Input(
+            placeholder="Type a command and press enter", classes="box", id="longboi"
+        )
+        # yield Static("4", classes="box")
+
+    async def on_input_submitted(self, message: Input.Submitted):
+        # logger.debug("Input submitted: %s", message.value)
+        self.main_out.add_line(message.value)
+
+    def action_toggle_dark(self) -> None:
+        """An action to toggle dark mode."""
+        self.dark = not self.dark
+
+
 class Game:
     def __init__(self, stdscr):
+        self.gui = GUIWrapper()
         self.wm = WindowManager(stdscr)
         self.player = Player(self.wm)
         self.map = Map(self.wm, 8, 4)
@@ -132,12 +222,8 @@ class Game:
         finally:
             self.player.x, self.player.y = (0, 0)
 
-    def map_turn(self):
-        # self.stdscr.clrtobot()
-        if (self.player.x, self.player.y) in self.current_tile.rooms:
-            room_name = self.current_tile.rooms[(self.player.x, self.player.y)]["name"]
-        else:
-            room_name = None
+    def maybe_enter_combat(self):
+        # Should we encounter an NPC?
         ct_npc = self.current_tile.npc  # there's only 1 rn
         if ct_npc.is_dead:
             pass
@@ -147,12 +233,23 @@ class Game:
             else:
                 print_stdscr(f"There is a friendly {ct_npc.name} in this room!")
                 print_stdscr("Non-hostile NPC encounters not yet implemented.")
+
+    def turn_prompt(self):
+        """Prompt the user to enter a command"""
+        # self.stdscr.clrtobot()
+        # self.maybe_enter_combat()
         self.current_tile.print_map(self.player.x, self.player.y)
-        print_stdscr("What direction do you want to move? [n/e/s/w] "
-        )
+        print_stdscr("What direction do you want to move? [n/e/s/w] ")
+
+    def get_room_name(self) -> str:
+        """Return the name of the room the player is currently in"""
+        if (self.player.x, self.player.y) in self.current_tile.rooms:
+            return self.current_tile.rooms[(self.player.x, self.player.y)]["name"]
+
+    def map_turn(self, command: str) -> bool | None:
+        """Process a user's input command"""
         # don't want any more lines so the map stays the same, use room_flavor_text instead
         # if room_name == 'portal': Utils.printline(self.stdscr, "You can leave through the portal in this room.")
-        command = get_input()
         print_stdscr("")
         if command in ["n", "e", "s", "w"]:
             if self.player.move(self.current_tile, command):  # move successful
@@ -165,7 +262,7 @@ class Game:
                     )
                 self._progress_time()
                 # TODO: print flavor text for room
-        elif room_name == "portal" and command in [
+        elif self.get_room_name() == "portal" and command in [
             "portal",
             "leave",
             "take portal",
@@ -182,8 +279,8 @@ class Game:
         ]:
             self.open_chest()
         # beyond here lies debug commands
-        elif self.debug and command[:2] == "ff":
-            self.combat(ct_npc)
+        # elif self.debug and command[:2] == "ff":
+        #     self.combat(ct_npc)
         elif self.debug and command[:2] == "xp":
             self.player.grant_xp(int(command[2:].strip()))
         elif self.debug and (command[:2] == "tp" or command[:4] == "tele"):
@@ -211,8 +308,11 @@ class Game:
             # input_field.getch()
             command = get_input()
             if command == "map":
-                while not self.map_turn():  # loop until it returns True
-                    pass  # TODO: perhaps pass time here?
+                self.turn_prompt()
+                while not self.map_turn(command):  # loop until it returns True
+                    # TODO: perhaps pass time here?
+                    self.turn_prompt()
+                    command = get_input()
                     # rn it'll return if nothing happens which should change
             elif command == "portal":
                 self.portal_into_another_dimension()
@@ -231,6 +331,8 @@ if __name__ == "__main__":
         handlers=[RichHandler(rich_tracebacks=False, console=console)],
     )
 
-    g = Game()
+    # g = Game()
+    gui = GUIWrapper()
+    gui.run()
 
     logger.info("\n________________\nInitialized mapgame logger")
