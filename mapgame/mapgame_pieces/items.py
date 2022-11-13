@@ -17,10 +17,12 @@ class Consumable(Item):
 
     def _do_consumable_effect(self, player):
         # Override this method!
-        Utils.printline(self.stdscr, "It doesn't seem to have any effect...")
+        raise NotImplementedError
+        # Utils.printline(self.stdscr, "It doesn't seem to have any effect...")
 
     def consume_item(self, player: "Player"):
         assert self in player.inventory
+        raise NotImplementedError
         Utils.printline(self.stdscr, f"You {self.consume_verb} the {self.name}")
         self._do_consumable_effect(player)
         player.inventory.remove(self)

@@ -46,7 +46,10 @@ As a temporary measure let's do this
 
 OKAY NOW THAT WE'VE CLEARED ALL THAT UP TIME FOR THE GRAND MASTER LIST OF TASKS FOR RIGHT NOW
 
-- replace all WindowManager references with GUIWrapper elements
-- wire input submission into map turn
-- make input field clear after submitting
-- wire the whole map up
+- [x] wire `GUIWrapper.on_input_submitted()` into `Game.map_turn()`
+- [x] replace all WindowManager references with GUIWrapper elements
+- [x] make input field clear after submitting
+- [x] replace `print_stdscr(` with `self.gui.main_out.add_line(`
+- [x] wire the whole map up
+- [x] add turn_prompt()
+- [x] fix bug where dimension 1 (the second one) is deja vu

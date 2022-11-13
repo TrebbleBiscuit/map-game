@@ -2,6 +2,7 @@ import logging
 import random
 import time
 from rich.logging import RichHandler
+from rich import markup
 from textual.app import App, ComposeResult
 from textual.widgets import Header, Footer, Static, Input
 from mapgame_pieces.player import Player
@@ -15,12 +16,6 @@ logging.addLevelName(70, "MAP")
 logger = logging.getLogger(__name__)
 
 INVALID_INPUT_MSG = color_string("Input not understood", "Style.DIM")
-
-
-# TODO: REMOVE ME
-class WindowManager:
-    # DUMMY CLASS
-    ...
 
 
 hellos = cycle(
@@ -65,12 +60,20 @@ class Hello(Static):
 
 
 class OutputWindow(Static):
-    def add_line(self, new_content):
+    def add_line(self, new_content: str):
         old_content = self.render()
         # logger.debug("%s newlines in old content", str(old_content).count("\n"))
-        if str(old_content).count("\n") + 1 >= self.content_size.height:
+        to_trunc = (
+            str(old_content).count("\n")
+            + new_content.count("\n")
+            + 3
+            - (self.content_size.height or 10)  # see following note for why 'or 10'
+        )
+        # 'or 10' because on_mount() height isn't set yet, so it comes across as 0
+        # set it to 10 instead so that we don't try and truncate nonexistent newlines
+        if to_trunc > 0:
             # truncate content to give the appearance of scrolling
-            old_content = str(old_content).split("\n", 1)[1]
+            old_content = str(old_content).split("\n", to_trunc)[to_trunc]
         self.update(old_content + "\n" + new_content)
 
         # logger.debug(self.content_size.height)
@@ -82,54 +85,73 @@ class GUIWrapper(App):
     CSS_PATH = "horizontal_layout.css"
 
     def __init__(self):
-        self.my_hello = Hello("Misc Info", classes="box")
-        self.main_out = OutputWindow("Main Output", classes="box", id="tallboi")
         super().__init__()
+        self.my_hello = Hello("Misc Info", classes="box")
+        self.main_out = OutputWindow("Welcome to mapgame!", classes="box", id="tallboi")
+        self.map_out = Static("Map", classes="box")
+        self.main_in = Input(
+            placeholder="Type a command and press enter", classes="box", id="longboi"
+        )
+        self.game = Game(gui=self)
 
     def compose(self) -> ComposeResult:
         yield Header()
         yield Footer()
         # yield Welcome()
-        yield Static("Map", classes="box")
+        yield self.map_out
         yield self.main_out
         # yield Hello("Misc Info", classes="box")
         yield self.my_hello
         # yield Static("Input", classes="box", id="longboi")
-        yield Input(
-            placeholder="Type a command and press enter", classes="box", id="longboi"
-        )
+        yield self.main_in
         # yield Static("4", classes="box")
+
+    def on_mount(self):
+        map_now = markup.escape(
+            self.game.current_tile.get_map(self.game.player.x, self.game.player.y)
+        )
+        self.map_out.update(map_now)
+        self.game.turn_prompt()
 
     async def on_input_submitted(self, message: Input.Submitted):
         # logger.debug("Input submitted: %s", message.value)
-        self.main_out.add_line(message.value)
+        self.game.map_turn(sanitize_input(message.value))
+        # escape markup so that `[n]` stays that way instead of disappearing
+        map_now = markup.escape(
+            self.game.current_tile.get_map(self.game.player.x, self.game.player.y)
+        )
+        self.map_out.update(map_now)
+        self.main_in.value = ""
+        self.game.turn_prompt()
 
     def action_toggle_dark(self) -> None:
         """An action to toggle dark mode."""
         self.dark = not self.dark
 
 
+def sanitize_input(in_str: str):
+    return in_str.strip().lower()
+
+
 class Game:
-    def __init__(self, stdscr):
-        self.gui = GUIWrapper()
-        self.wm = WindowManager(stdscr)
-        self.player = Player(self.wm)
-        self.map = Map(self.wm, 8, 4)
+    def __init__(self, gui: GUIWrapper):
+        self.gui = gui
+        self.player = Player()
+        self.map = Map(gui, 8, 4)
         self.current_tile = self.map.tiles[0]  # self.map.tiles[self.player.tile_index]
         self.time = 0
         # self.x = 0
         # self.y = 0
         self.debug = True
-        self.play()
 
     def _progress_time(self):
         self.player._heal_over_time()
         self.time += 1
         self.current_tile.npc._on_time_pass(self.current_tile)
         # if random.randint(0, 9) == 0:
-        #     print_stdscr("Random enemy encounter!!!!")
+        #     self.gui.main_out.add_line("Random enemy encounter!!!!")
         #     enemy = NPC.generate_from_level(self.player.tile_index)
-        #     print_stdscr(vars(enemy))
+        #     self.gui.main_out.add_line(vars(enemy))
         #     self.combat(enemy)
         #     # uinput = ''
         #     # while uinput.lower() != 'ok':
@@ -139,43 +161,44 @@ class Game:
     def combat(self, hostile: NPC):
         in_combat = True
         enemy_text = color_string(f"{hostile.name}", "Fore.RED")
-        print_stdscr(f"\nEntered combat with a hostile {enemy_text}!")
-        self.wm.mapscr.clear()
-        print_mapscr("COMBAT TIME >:I")
-        self.wm.mapscr.refresh()
+        self.gui.main_out.add_line(f"\nEntered combat with a hostile {enemy_text}!")
+        # clear screen
+        # clear map screen ?
         while in_combat:
             took_turn = False
-            print_stdscr(
+            self.gui.main_out.add_line(
                 f"{enemy_text.title()}: {hostile.hp}/{hostile.max_hp} HP",
             )
-            print_stdscr(f"You: {self.player.hp}/{self.player.max_hp} HP")
-            print_stdscr(
+            self.gui.main_out.add_line(f"You: {self.player.hp}/{self.player.max_hp} HP")
+            self.gui.main_out.add_line(
                 f"You can {color_string('melee', 'Fore.RED')} attack, or attempt to {color_string('run', 'Fore.CYAN')}.",
             )
             try:
+                raise NotImplementedError
+                # can't get input this way
                 ui = get_input()
             except KeyboardInterrupt:
                 logger.warning("caught KeyboardInterrupt to break out of combat")
                 in_combat = False
                 continue
             if ui in ["melee", "m"]:
-                print_stdscr("")
+                self.gui.main_out.add_line("")
                 base_dmg = self.player.attack_power
                 min_dmg = int((base_dmg * 0.5) + 0.5)
                 max_dmg = int(base_dmg * 1.5)
                 act_dmg = random.randint(min_dmg, max_dmg)
-                print_stdscr(f"You take a swing at the {enemy_text}!")
+                self.gui.main_out.add_line(f"You take a swing at the {enemy_text}!")
                 dmg_txt = color_string(f"{act_dmg} damage", "Fore.RED")
-                print_stdscr(f"You do ({min_dmg}-{max_dmg}) {dmg_txt}!")
+                self.gui.main_out.add_line(f"You do ({min_dmg}-{max_dmg}) {dmg_txt}!")
                 hostile.take_damage(act_dmg)
                 took_turn = True
             elif ui in ["run", "r"]:
-                print_stdscr("")
-                print_stdscr("You run away!")
+                self.gui.main_out.add_line("")
+                self.gui.main_out.add_line("You run away!")
                 in_combat = False
                 took_turn = True
             else:
-                print_stdscr(INVALID_INPUT_MSG)
+                self.gui.main_out.add_line(INVALID_INPUT_MSG)
             if took_turn and in_combat:
                 if hostile.hp <= 0:
                     logger.info("Ending combat because enemy is dead")
@@ -189,17 +212,17 @@ class Game:
                     min_dmg = int((base_dmg * 0.5) + 0.5)
                     max_dmg = int(base_dmg * 1.5)
                     act_dmg = random.randint(min_dmg, max_dmg)
-                    print_stdscr(f"The {enemy_text} attacks you!")
+                    self.gui.main_out.add_line(f"The {enemy_text} attacks you!")
                     dmg_txt = color_string(f"{act_dmg} damage", "Fore.RED")
-                    print_stdscr(
+                    self.gui.main_out.add_line(
                         f"It connects for ({min_dmg}-{max_dmg}) {dmg_txt}!",
                     )
                     self.player.take_damage(act_dmg)
-                    print_stdscr("")
+                    self.gui.main_out.add_line("")
 
     def open_chest(self):
         self.current_tile.chests.remove((self.player.x, self.player.y))
-        print_stdscr("You open a chest! There's nothing inside.")
+        self.gui.main_out.add_line("You open a chest! There's nothing inside.")
         time.sleep(0.5)
 
     def portal_into_another_dimension(self, dim_num=None):
@@ -208,12 +231,12 @@ class Game:
         else:
             pass
         self.player.tile_index = dim_num
-        print_stdscr(f"You portal into dimension #{dim_num}")
+        self.gui.main_out.add_line(f"You portal into dimension #{dim_num}")
         try:
             self.current_tile = self.map.tiles[dim_num]
-            logger.debug("This dimension already existed")
+            self.gui.main_out.add_line("This dimension already existed")
         except IndexError:
-            print_stdscr(
+            self.gui.main_out.add_line(
                 color_string("This dimension needed to be generated", "Style.BRIGHT")
             )
             self.player.grant_xp(dim_num * 2)
@@ -231,15 +254,18 @@ class Game:
             if ct_npc.will_attack_player():
                 self.combat(ct_npc)
             else:
-                print_stdscr(f"There is a friendly {ct_npc.name} in this room!")
-                print_stdscr("Non-hostile NPC encounters not yet implemented.")
+                self.gui.main_out.add_line(
+                    f"There is a friendly {ct_npc.name} in this room!"
+                )
+                self.gui.main_out.add_line(
+                    "Non-hostile NPC encounters not yet implemented."
+                )
 
     def turn_prompt(self):
         """Prompt the user to enter a command"""
         # self.stdscr.clrtobot()
         # self.maybe_enter_combat()
-        self.current_tile.print_map(self.player.x, self.player.y)
-        print_stdscr("What direction do you want to move? [n/e/s/w] ")
+        self.gui.main_out.add_line("What direction do you want to move? [n/e/s/w] ")
 
     def get_room_name(self) -> str:
         """Return the name of the room the player is currently in"""
@@ -250,26 +276,32 @@ class Game:
         """Process a user's input command"""
         # don't want any more lines so the map stays the same, use room_flavor_text instead
         # if room_name == 'portal': Utils.printline(self.stdscr, "You can leave through the portal in this room.")
-        print_stdscr("")
-        if command in ["n", "e", "s", "w"]:
-            if self.player.move(self.current_tile, command):  # move successful
-                print_stdscr("You move in that direction.\n")
+        logger.info("processing command %s", command)
+        self.gui.main_out.add_line("")
+        if not command:
+            return
+        elif command in ["n", "e", "s", "w"]:
+            player_move = self.player.move(self.current_tile, command)
+            if player_move:  # move successful
+                self.gui.main_out.add_line(f"You move {player_move}.")
                 self.current_tile.explored.add((self.player.x, self.player.y))
                 self.current_tile.room_flavor_text((self.player.x, self.player.y))
                 if (self.player.x, self.player.y) in self.current_tile.chests:
-                    print_stdscr(
+                    self.gui.main_out.add_line(
                         "There's a chest in this room! You wonder what's inside!"
                     )
                 self._progress_time()
                 # TODO: print flavor text for room
+            else:
+                self.gui.main_out.add_line("You can't move that way.")
         elif self.get_room_name() == "portal" and command in [
             "portal",
             "leave",
             "take portal",
             "p",
         ]:
-            self.wm.mapscr.clear()
-            print_stdscr("You take the portal into the next dimension...")
+            # clear screen
+            self.gui.main_out.add_line("You take the portal into the next dimension...")
             self.portal_into_another_dimension()
             return True  # don't loop
         elif (self.player.x, self.player.y) in self.current_tile.chests and command in [
@@ -284,27 +316,29 @@ class Game:
         elif self.debug and command[:2] == "xp":
             self.player.grant_xp(int(command[2:].strip()))
         elif self.debug and (command[:2] == "tp" or command[:4] == "tele"):
-            print_stdscr('teleport to what coordinates? (i.e. "1, 3")')
-            print_stdscr("remember y is inverted")
-            tc = get_input()
+            self.gui.main_out.add_line('teleport to what coordinates? (i.e. "1, 3")')
+            self.gui.main_out.add_line("remember y is inverted")
+            tc = command.split(" ")[1]
             try:
                 tc = tuple(int(cv.strip()) for cv in tc.split(","))
             except:
-                print_stdscr("invalid coordinates!")
+                self.gui.main_out.add_line("invalid coordinates!")
                 return
             if self.current_tile._check_valid_coords(tc):
                 self.player.x, self.player.y = tc
                 self.current_tile.explored.add((self.player.x, self.player.y))
-                print_stdscr("poof~")
+                self.gui.main_out.add_line("poof~")
             else:
-                print_stdscr("off-map coordinates not allowed")
+                self.gui.main_out.add_line("off-map coordinates not allowed")
         else:
-            print_stdscr(INVALID_INPUT_MSG)
+            self.gui.main_out.add_line(INVALID_INPUT_MSG)
 
     def play(self):
         print("\n" * 30)  # clear screen
         while True:
-            print_stdscr("You are in the hub world. Go to 'map' or 'portal' pls.")
+            self.gui.main_out.add_line(
+                "You are in the hub world. Go to 'map' or 'portal' pls."
+            )
             # input_field.getch()
             command = get_input()
             if command == "map":
@@ -332,7 +366,7 @@ if __name__ == "__main__":
     )
 
     # g = Game()
-    gui = GUIWrapper()
-    gui.run()
+    wrapper = GUIWrapper()
+    wrapper.run()
 
     logger.info("\n________________\nInitialized mapgame logger")

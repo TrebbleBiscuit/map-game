@@ -8,14 +8,13 @@ logger = logging.getLogger(__name__)
 class LivingThing:
     """Base class for anything that moves around, has hp, etc"""
 
-    def __init__(self, wm):
-        self.wm = wm
+    def __init__(self):
         self.is_dead = False
         self.max_hp = 20
         self.hp = self.max_hp
         self.x = 0
         self.y = 0
-        self.tile_index = 0
+        self.tile_index = 1
         self.luck = 0
         self.attack_power = 1
 
@@ -24,23 +23,23 @@ class LivingThing:
             print_stdscr("This living thing is healing over time")
             self.hp += 1
 
-    def move(self, tile: "map.Tile", direction: str) -> bool | None:
+    def move(self, tile: "map.Tile", direction: str) -> str | None:
         if not tile.check_move(self.x, self.y, direction):
             logger.debug(
                 "Living thing attempted to move %s; there is no path", direction
             )
         elif direction == "n":
             self.y -= 1
-            return True
+            return "north"
         elif direction == "s":
             self.y += 1
-            return True
+            return "south"
         elif direction == "e":
             self.x += 1
-            return True
+            return "east"
         elif direction == "w":
             self.x -= 1
-            return True
+            return "west"
         else:
             print_stdscr("Invalid direction")
 
@@ -48,8 +47,8 @@ class LivingThing:
 class NPC(LivingThing):
     """NPC wander around, open chests, and engage the player in combat."""
 
-    def __init__(self, wm, name: str):
-        super().__init__(wm)
+    def __init__(self, name: str):
+        super().__init__()
         self.name = name
         self.max_hp = 30
         self.player_attitude = (
@@ -60,10 +59,10 @@ class NPC(LivingThing):
         self.is_dead = False
 
     @classmethod
-    def generate_from_level(cls, wm, level: int):
+    def generate_from_level(cls, level: int):
         logger.info(f"Generating level {level} enemy")
         name = random.choice(["slime", "skeleton", "bad guy"])
-        inst = cls(wm, name)
+        inst = cls(name)
         inst.max_hp = 20 + (level * 5)
         inst.hp = inst.max_hp
         inst.attack_power = 2 + level

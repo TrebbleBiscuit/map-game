@@ -1,22 +1,23 @@
 Screen {
     layout: grid;
     grid-size: 2;
-    grid-columns: 1fr 3fr;
+    grid-columns: 2fr 5fr;
     grid-rows: 60% 20% 20%;
 }
 
 #longboi {
     column-span: 2;
-    tint: rgb(160, 37, 0) 40%;
+    tint: midnightblue 40%;
 }
 
 #tallboi {
     row-span: 2;
-    tint: magenta 40%;
+    tint: darkmagenta 40%;
 }
 
 .box {
     height: 100%;
     /* width: 1fr; */
+    padding: 1 2;
     border: solid green;
 }

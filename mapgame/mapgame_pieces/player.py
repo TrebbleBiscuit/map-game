@@ -4,8 +4,8 @@ from mapgame_pieces.utils import print_stdscr, color_string
 
 
 class Player(LivingThing):
-    def __init__(self, wm):
-        super().__init__(wm)
+    def __init__(self):
+        super().__init__()
         self.max_hp = 50
         self.hp = self.max_hp
         self.attack_power = 5
