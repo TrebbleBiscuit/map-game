@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "map-game"
+version = "0.1.0"
+description = ""
+authors = ["Erik Nielsen <erik@meme.lol>"]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+rich = "^12"
+textual = {extras = ["dev"], version = "^0.3.0"}
+
+[tool.poetry.group.dev.dependencies]
+black = {version = "^22.10.0", allow-prereleases = true}
+
+[build-system]
+requires = ["poetry>=1.1.12"]
+build-backend = "poetry.masonry.api"
