@@ -1,6 +1,5 @@
 import logging
 import random
-import time
 from rich.logging import RichHandler
 from mapgame_pieces.player import Player
 from mapgame_pieces.alive import NPC
@@ -47,16 +46,20 @@ class Game:
         #     #     the input abve won't work with curses, fix that when you uncomment
         #     #     uinput = input(self.wm.stdscr, "you gotta type ok to continue!")
 
-    def enter_combat(self, hostile: NPC):
+    def enter_combat(self, hostiles: list[NPC]):
         if self.in_combat_vs:
             raise RuntimeError(
                 f"Attempted to enter combat, but player is already fighting: {self.in_combat_vs}"
             )
         # only support 1v1 combat rn but eventually want multiple hostiles
-        self.in_combat_vs = [hostile]
+        self.in_combat_vs = hostiles
         self.game_state = GameState.in_combat
-        enemy_text = color_string(f"{hostile.name}", "Fore.RED")
-        self.gui.main_out.add_line(f"\nEntered combat with a hostile {enemy_text}!")
+        if len(hostiles) == 1:
+            enemy_text = color_string(f"{hostiles[0].name}", "Fore.RED")
+            self.gui.main_out.add_line(f"\nEntered combat with a hostile {enemy_text}!")
+        else:
+            enemy_text = color_string(", ".join(h.name for h in hostiles), "Fore.RED")
+            self.gui.main_out.add_line(f"\nEntered combat with hostiles: {enemy_text}!")
 
     def end_combat(self):
         self.in_combat_vs = []
@@ -64,8 +67,10 @@ class Game:
 
     def combat(self, ui: str):
         assert len(self.in_combat_vs) == 1
-        hostile = self.in_combat_vs[0]
-        enemy_text = color_string(f"{hostile.name}", "Fore.RED")
+        if len(self.in_combat_vs) > 1:
+            enemy_text = color_string("enemies", "Fore.RED")
+        else:
+            enemy_text = color_string(f"{self.in_combat_vs[0].name}", "Fore.RED")
         if ui in ["melee", "m"]:
             self.gui.main_out.add_line("")
             base_dmg = self.player.attack_power
@@ -75,27 +80,33 @@ class Game:
             self.gui.main_out.add_line(f"You take a swing at the {enemy_text}!")
             dmg_txt = color_string(f"{act_dmg} damage", "Fore.RED")
             self.gui.main_out.add_line(f"You do ({min_dmg}-{max_dmg}) {dmg_txt}!")
-            hostile.take_damage(act_dmg)
+            for h in self.in_combat_vs:
+                h.take_damage(act_dmg)
         elif ui in ["run", "r"]:
             self.gui.main_out.add_line("")
             self.gui.main_out.add_line("You run away!")
             self.end_combat()
             return
         else:
-            self.gui.main_out.add_line()
+            self.gui.main_out.add_line("")
             self.gui.main_out.add_line(INVALID_INPUT_MSG)
             return
-
-        if hostile.hp <= 0:
-            logger.info("Ending combat because enemy is dead")
-            self.player.grant_xp(hostile.xp_reward)
+        # if any hostiles are dead, give xp and update list of hostiles
+        out_of_combat = []
+        for hostile in self.in_combat_vs:
+            if hostile.is_dead:
+                out_of_combat.append(hostile)
+                self.player.grant_xp(hostile.xp_reward)
+            elif hostile.player_attitude > 0:
+                out_of_combat.append(hostile)
+                logger.info(f"{hostile.name} exits combat because attitude is high")
+        if out_of_combat:
+            self.in_combat_vs = [x for x in self.in_combat_vs if x not in out_of_combat]
+        if not self.in_combat_vs:
+            logger.info("Ending combat because all enemies are dead")
             self.end_combat()
             return
-        elif hostile.player_attitude > 0:
-            logger.info("Ending combat because attitude is high")
-            self.end_combat()
-            return
-        else:
+        for hostile in self.in_combat_vs:
             self.hostile_combat_turn(hostile)
 
     def hostile_combat_turn(self, hostile: NPC):
@@ -115,7 +126,6 @@ class Game:
     def open_chest(self):
         self.current_tile.chests.remove((self.player.x, self.player.y))
         self.gui.main_out.add_line("You open a chest! There's nothing inside.")
-        time.sleep(0.5)
 
     def portal_into_another_dimension(self, dim_num=None):
         if dim_num is None:
@@ -144,7 +154,7 @@ class Game:
             pass
         elif (ct_npc.x, ct_npc.y) == (self.player.x, self.player.y):
             if ct_npc.will_attack_player():
-                self.enter_combat(ct_npc)
+                self.enter_combat([ct_npc])
             else:
                 self.gui.main_out.add_line(
                     f"There is a friendly {ct_npc.name} in this room!"
@@ -159,12 +169,11 @@ class Game:
         if self.game_state == GameState.in_map:
             self.gui.main_out.add_line("What direction do you want to move? [n/e/s/w] ")
         elif self.game_state == GameState.in_combat:
-            assert len(self.in_combat_vs) == 1
-            hostile = self.in_combat_vs[0]
-            enemy_text = color_string(f"{hostile.name}", "Fore.RED")
-            self.gui.main_out.add_line(
-                f"{enemy_text.title()}: {hostile.hp}/{hostile.max_hp} HP",
-            )
+            for hostile in self.in_combat_vs:
+                enemy_text = color_string(f"{hostile.name}", "Fore.RED")
+                self.gui.main_out.add_line(
+                    f"{enemy_text.title()}: {hostile.hp}/{hostile.max_hp} HP",
+                )
             self.gui.main_out.add_line(f"You: {self.player.hp}/{self.player.max_hp} HP")
             self.gui.main_out.add_line(
                 f"You can {color_string('melee', 'Fore.RED')} attack, or attempt to {color_string('run', 'Fore.CYAN')}.",
@@ -172,10 +181,10 @@ class Game:
         else:
             raise ValueError(f"Invalid Game State '{self.game_state}'")
 
-    def get_current_room_name(self) -> str:
+    def get_current_room_name(self) -> str | None:
         """Return the name of the room the player is currently in"""
         if (self.player.x, self.player.y) in self.current_tile.rooms:
-            return self.current_tile.rooms[(self.player.x, self.player.y)]["name"]
+            return self.current_tile.rooms[(self.player.x, self.player.y)].name
 
     def map_turn(self, command: str) -> bool | None:
         """Process a user's input command"""

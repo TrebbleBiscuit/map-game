@@ -2,8 +2,17 @@ import logging
 from mapgame_pieces.alive import NPC
 import math
 import random
+from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class Room:
+    x: int
+    y: int
+    name: str
+    map_icon: str
 
 
 class Tile:
@@ -11,31 +20,39 @@ class Tile:
         self.gui = gui
         self.height = height
         self.width = width
-        self.rooms = {
-            (0, 0): {
-                "name": "entrance",
-                "map_icon": "[e]",
-            },  # x, y
-            (self.width - 1, 0): {
-                "name": "portal",
-                "map_icon": "[p]",
-            },  # default for now
-        }
+        self.rooms = self._starting_rooms()
+        # {
+        #     (0, 0): {
+        #         "name": "entrance",
+        #         "map_icon": "[e]",
+        #     },  # x, y
+        #     (self.width - 1, 0): {
+        #         "name": "portal",
+        #         "map_icon": "[p]",
+        #     },  # default for now
+        # }
         self.chests = set()
         self.spawn_chests()
-        self.explored = set(
+        self.explored: set[tuple[int, int]] = set(
             [(0, 0)]
         )  # had to put the tuple in a list to get it to turn into a set of tuples
         self.paths = self.generate_paths(self.width * self.height)
         self.all_visible = False
         self.npc = NPC.generate_from_level(1)
-        self.npc.x, self.npc.y = self.gen_random_coordinates()
+        self.npc.x, self.npc.y = (1, 0)  # self.gen_random_coordinates()
         logger.debug(f"NPC spawned at {(self.npc.x, self.npc.y)}")
 
-    def gen_random_coordinates(self):
+    def _starting_rooms(self) -> dict[tuple[int, int], Room]:
+        rooms = {}
+        rooms[(0, 0)] = Room(x=0, y=0, name="entrance", map_icon="[e]")
+        rooms[(self.width - 1, 0)] = Room(
+            x=self.width - 1, y=0, name="portal", map_icon="[p]"
+        )
+        return rooms
+
+    def gen_random_coordinates(self) -> tuple[int, int]:
         """Does not select coordinates with existing rooms or chests"""
-        valid = False
-        while not valid:
+        while True:
             x, y = random.randint(0, self.width - 1), random.randint(0, self.height - 1)
             try:
                 # logger.debug(f"Checking if {(x, y)} is in rooms")
@@ -44,8 +61,7 @@ class Tile:
             except KeyError:
                 # logger.debug("It isn't, let's see if there's already a chest here")
                 if (x, y) not in self.chests:
-                    valid = True
-        return x, y
+                    return x, y
 
     def spawn_chests(self):
         n_chests = int(math.sqrt(self.height * self.width))
@@ -56,7 +72,7 @@ class Tile:
 
     def room_flavor_text(self, room_coords):
         try:
-            room_name = self.rooms[room_coords]["name"]
+            room_name = self.rooms[room_coords].name
             self.gui.main_out.add_line(f"You stand in the {room_name} room!")
             if room_name == "portal":
                 # leave_txt = Utils.color_string(f"leave", Fore.MAGENTA)
@@ -211,7 +227,7 @@ class Tile:
                     mapstr += "[x]"  # this is the player's room
                 elif (x, y) in self.explored:
                     if (x, y) in self.rooms:
-                        mapstr += self.rooms[(x, y)]["map_icon"]
+                        mapstr += self.rooms[(x, y)].map_icon
                     else:
                         mapstr += "[.]"  # explored, empty
                 else:
