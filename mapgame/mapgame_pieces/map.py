@@ -36,7 +36,7 @@ class Tile:
         """Does not select coordinates with existing rooms or chests"""
         valid = False
         while not valid:
-            x, y = random.randint(0, self.width), random.randint(0, self.height)
+            x, y = random.randint(0, self.width - 1), random.randint(0, self.height - 1)
             try:
                 # logger.debug(f"Checking if {(x, y)} is in rooms")
                 self.rooms[(x, y)]

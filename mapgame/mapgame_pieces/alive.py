@@ -1,5 +1,4 @@
 import random
-from mapgame_pieces.utils import print_stdscr
 import logging
 
 logger = logging.getLogger(__name__)
@@ -20,10 +19,19 @@ class LivingThing:
 
     def _heal_over_time(self):
         if self.hp < 20:
-            print_stdscr("This living thing is healing over time")
+            logger.debug("This living thing is healing over time")
             self.hp += 1
 
     def move(self, tile: "map.Tile", direction: str) -> str | None:
+        """Attempt to move a given direction
+
+        Args:
+            tile (map.Tile): Map tile
+            direction (str): Direction to move ('n', 'e', 's', or 'w')
+
+        Returns:
+            str | None: Name of direction, if the move worked
+        """
         if not tile.check_move(self.x, self.y, direction):
             logger.debug(
                 "Living thing attempted to move %s; there is no path", direction
@@ -41,7 +49,7 @@ class LivingThing:
             self.x -= 1
             return "west"
         else:
-            print_stdscr("Invalid direction")
+            logger.debug("Invalid direction")
 
 
 class NPC(LivingThing):
@@ -100,7 +108,7 @@ class NPC(LivingThing):
     def take_damage(self, dmg: int):
         self.hp -= dmg
         if self.hp <= 0:
-            print_stdscr(
+            logger.debug(
                 "It falls to the ground in a heap, then disappears in a flash of light!",
             )
             self.is_dead = True
