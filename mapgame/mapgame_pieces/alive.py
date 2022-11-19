@@ -65,11 +65,11 @@ class NPC(LivingThing):
         self.is_dead = False
 
     @classmethod
-    def generate_from_level(cls, level: int):
+    def generate_from_level(cls, level: int) -> "NPC":
         logger.info(f"Generating level {level} enemy")
         name = random.choice(["slime", "skeleton", "bad guy"])
         inst = cls(name)
-        inst.max_hp = 20 + (level * 5)
+        inst.max_hp = random.randrange(15, 25) + (level * 5)
         inst.hp = inst.max_hp
         inst.attack_power = 2 + level
         inst.xp_reward = (level + 1) * 2
