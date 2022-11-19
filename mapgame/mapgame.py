@@ -35,7 +35,8 @@ class Game:
     def _progress_time(self):
         self.player._heal_over_time()
         self.time += 1
-        self.current_tile.npc._on_time_pass(self.current_tile)
+        for npc in self.current_tile.npcs:
+            npc._on_time_pass(self.current_tile)
         # if random.randint(0, 9) == 0:
         #     self.gui.main_out.add_line("Random enemy encounter!!!!")
         #     enemy = NPC.generate_from_level(self.player.tile_index)
@@ -62,11 +63,14 @@ class Game:
             self.gui.main_out.add_line(f"\nEntered combat with hostiles: {enemy_text}!")
 
     def end_combat(self):
+        self.gui.main_out.add_line(
+            "You emerge from combat victorious! Time to keep exploring."
+        )
         self.in_combat_vs = []
         self.game_state = GameState.in_map
 
     def combat(self, ui: str):
-        assert len(self.in_combat_vs) == 1
+        assert len(self.in_combat_vs) > 0
         if len(self.in_combat_vs) > 1:
             enemy_text = color_string("enemies", "Fore.RED")
         else:
@@ -149,19 +153,22 @@ class Game:
 
     def maybe_enter_combat(self):
         # Should we encounter an NPC?
-        ct_npc = self.current_tile.npc  # there's only 1 rn
-        if ct_npc.is_dead:
-            pass
-        elif (ct_npc.x, ct_npc.y) == (self.player.x, self.player.y):
-            if ct_npc.will_attack_player():
-                self.enter_combat([ct_npc])
-            else:
-                self.gui.main_out.add_line(
-                    f"There is a friendly {ct_npc.name} in this room!"
-                )
-                self.gui.main_out.add_line(
-                    "Non-hostile NPC encounters not yet implemented."
-                )
+        attacking_npcs = []
+        for ct_npc in self.current_tile.npcs:
+            if ct_npc.is_dead:
+                pass
+            elif (ct_npc.x, ct_npc.y) == (self.player.x, self.player.y):
+                if ct_npc.will_attack_player():
+                    attacking_npcs.append(ct_npc)
+                else:
+                    self.gui.main_out.add_line(
+                        f"There is a friendly {ct_npc.name} in this room!"
+                    )
+                    self.gui.main_out.add_line(
+                        "Non-hostile NPC encounters not yet implemented."
+                    )
+        if attacking_npcs:
+            self.enter_combat(attacking_npcs)
 
     def turn_prompt(self):
         """Prompt the user to enter a command"""
@@ -190,7 +197,6 @@ class Game:
         """Process a user's input command"""
         # don't want any more lines so the map stays the same, use room_flavor_text instead
         # if room_name == 'portal': Utils.printline(self.stdscr, "You can leave through the portal in this room.")
-        logger.info("processing command %s", command)
         self.gui.main_out.add_line("")
         if not command:
             return
@@ -271,12 +277,14 @@ if __name__ == "__main__":
     logging.basicConfig(
         level=logging.DEBUG,
         format="%(asctime)s {%(filename)s:%(lineno)d} %(levelname)s - %(message)s",
-        # filename="mapgame.log",
+        filemode="a",
+        filename="mapgame.log",
         datefmt="[%X]",
-        handlers=[RichHandler(rich_tracebacks=False)],
+        # handlers=[RichHandler(rich_tracebacks=False)],
     )
 
+    logger.info("\n________________\nInitialized mapgame logger; beginning game...")
     # g = Game()
     game = Game()
 
-    logger.info("\n________________\nInitialized mapgame logger")
+    logger.info("\n________________\nGame Over")

@@ -38,9 +38,10 @@ class Tile:
         )  # had to put the tuple in a list to get it to turn into a set of tuples
         self.paths = self.generate_paths(self.width * self.height)
         self.all_visible = False
-        self.npc = NPC.generate_from_level(1)
-        self.npc.x, self.npc.y = (1, 0)  # self.gen_random_coordinates()
-        logger.debug(f"NPC spawned at {(self.npc.x, self.npc.y)}")
+        self.npcs = [NPC.generate_from_level(1)]
+        for npc in self.npcs:
+            npc.x, npc.y = self.gen_random_coordinates()
+            logger.debug(f"NPC spawned at {(npc.x, npc.y)}")
 
     def _starting_rooms(self) -> dict[tuple[int, int], Room]:
         rooms = {}

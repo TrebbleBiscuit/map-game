@@ -33,9 +33,7 @@ class LivingThing:
             str | None: Name of direction, if the move worked
         """
         if not tile.check_move(self.x, self.y, direction):
-            logger.debug(
-                "Living thing attempted to move %s; there is no path", direction
-            )
+            pass  # invalid path
         elif direction == "n":
             self.y -= 1
             return "north"
@@ -93,9 +91,6 @@ class NPC(LivingThing):
             random.shuffle(move_options)
             mv_choice = move_options.pop()
             while not self.move(tile, mv_choice):  # try to move until it works
-                logger.debug(
-                    "NPC tried to move to an invalid location; trying another way..."
-                )
                 try:
                     mv_choice = move_options.pop()
                 except IndexError:

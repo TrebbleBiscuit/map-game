@@ -53,5 +53,5 @@ class Player(LivingThing):
     def _heal_over_time(self):
         super()._heal_over_time()
         if self.hp < self.max_hp:
-            self.gui.main_out.add_line("The player heals twice as fast")
             self.hp += 1
+        self.gui.main_out.add_line("You regain some HP")
