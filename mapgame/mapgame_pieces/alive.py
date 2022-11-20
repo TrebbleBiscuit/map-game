@@ -1,5 +1,4 @@
 import random
-from mapgame_pieces.utils import print_stdscr
 import logging
 
 logger = logging.getLogger(__name__)
@@ -19,15 +18,21 @@ class LivingThing:
         self.attack_power = 1
 
     def _heal_over_time(self):
-        if self.hp < 20:
-            print_stdscr("This living thing is healing over time")
+        if self.hp < self.max_hp:
             self.hp += 1
 
-    def move(self, tile: "map.Tile", direction: str) -> str | None:
+    def move(self, tile: "Tile", direction: str) -> str | None:
+        """Attempt to move a given direction
+
+        Args:
+            tile (map.Tile): Map tile
+            direction (str): Direction to move ('n', 'e', 's', or 'w')
+
+        Returns:
+            str | None: Name of direction, if the move worked
+        """
         if not tile.check_move(self.x, self.y, direction):
-            logger.debug(
-                "Living thing attempted to move %s; there is no path", direction
-            )
+            pass  # invalid path
         elif direction == "n":
             self.y -= 1
             return "north"
@@ -41,7 +46,7 @@ class LivingThing:
             self.x -= 1
             return "west"
         else:
-            print_stdscr("Invalid direction")
+            logger.debug("Invalid direction")
 
 
 class NPC(LivingThing):
@@ -59,11 +64,11 @@ class NPC(LivingThing):
         self.is_dead = False
 
     @classmethod
-    def generate_from_level(cls, level: int):
-        logger.info(f"Generating level {level} enemy")
-        name = random.choice(["slime", "skeleton", "bad guy"])
+    def generate_from_level(cls, level: int) -> "NPC":
+        name = random.choice(["slime", "skeleton", "bad guy", "zombie", "mugger"])
+        logger.info(f"Generating level {level} enemy {name}")
         inst = cls(name)
-        inst.max_hp = 20 + (level * 5)
+        inst.max_hp = random.randrange(15, 25) + (level * 5)
         inst.hp = inst.max_hp
         inst.attack_power = 2 + level
         inst.xp_reward = (level + 1) * 2
@@ -85,9 +90,6 @@ class NPC(LivingThing):
             random.shuffle(move_options)
             mv_choice = move_options.pop()
             while not self.move(tile, mv_choice):  # try to move until it works
-                logger.debug(
-                    "NPC tried to move to an invalid location; trying another way..."
-                )
                 try:
                     mv_choice = move_options.pop()
                 except IndexError:
@@ -100,7 +102,7 @@ class NPC(LivingThing):
     def take_damage(self, dmg: int):
         self.hp -= dmg
         if self.hp <= 0:
-            print_stdscr(
+            logger.debug(
                 "It falls to the ground in a heap, then disappears in a flash of light!",
             )
             self.is_dead = True
