@@ -38,7 +38,7 @@ class Tile:
         )  # had to put the tuple in a list to get it to turn into a set of tuples
         self.paths = self.generate_paths(self.width * self.height)
         self.all_visible = False
-        self.npcs = [NPC.generate_from_level(1) for x in range(8)]
+        self.npcs = [NPC.generate_from_level(1) for x in range(4)]
         for npc in self.npcs:
             npc.x, npc.y = self.gen_random_coordinates()
             logger.debug(f"NPC spawned at {(npc.x, npc.y)}")
@@ -121,7 +121,7 @@ class Tile:
             island_nodes = self._nodes_on_this_island(0, 0, paths)
         return paths
 
-    def _nodes_on_this_island(self, start_x: int, start_y: int, paths) -> "List(tuple)":
+    def _nodes_on_this_island(self, start_x: int, start_y: int, paths) -> list[tuple]:
         coords_to_search = [(start_x, start_y)]
         found_nodes = [(start_x, start_y)]
         while len(coords_to_search) > 0:
@@ -143,8 +143,8 @@ class Tile:
         return found_nodes
 
     def _nodes_with_inaccessible_adjacencies(
-        self, island_nodes: "List(tuple)"
-    ) -> "List(tuple)":
+        self, island_nodes: list[tuple]
+    ) -> list[tuple]:
         # returns a list of node coordinate tuples
         relevant_nodes = []
         for coords in island_nodes:

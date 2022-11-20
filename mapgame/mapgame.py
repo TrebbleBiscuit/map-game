@@ -4,9 +4,10 @@ from rich.logging import RichHandler
 from mapgame_pieces.player import Player
 from mapgame_pieces.alive import NPC
 from mapgame_pieces.map import Map
-from mapgame_pieces.utils import color_string, sanitize_input
+from mapgame_pieces.utils import color_string, sanitize_input, get_plural_suffix
 from enum import Enum
 from mapgame_pieces.gui import GUIWrapper
+from mapgame_pieces.items import Item
 
 logger = logging.getLogger(__name__)
 
@@ -69,23 +70,23 @@ class Game:
         self.in_combat_vs = []
         self.game_state = GameState.in_map
 
-    def combat(self, ui: str):
-        assert len(self.in_combat_vs) > 0
-        if len(self.in_combat_vs) > 1:
-            enemy_text = color_string("enemies", "Fore.RED")
-        else:
-            enemy_text = color_string(f"{self.in_combat_vs[0].name}", "Fore.RED")
-        if ui in ["melee", "m"]:
-            self.gui.main_out.add_line("")
-            base_dmg = self.player.attack_power
-            min_dmg = int((base_dmg * 0.5) + 0.5)
-            max_dmg = int(base_dmg * 1.5)
+    def melee_attack_hostiles(self):
+        self.gui.main_out.add_line("")
+        base_dmg = self.player.attack_power
+        min_dmg = int((base_dmg * 0.5) + 0.5)
+        max_dmg = int(base_dmg * 1.5)
+        for hostile in self.in_combat_vs:
+            enemy_text = color_string(f"{hostile.name}", "Fore.RED")
             act_dmg = random.randint(min_dmg, max_dmg)
             self.gui.main_out.add_line(f"You take a swing at the {enemy_text}!")
             dmg_txt = color_string(f"{act_dmg} damage", "Fore.RED")
             self.gui.main_out.add_line(f"You do ({min_dmg}-{max_dmg}) {dmg_txt}!")
-            for h in self.in_combat_vs:
-                h.take_damage(act_dmg)
+            hostile.take_damage(act_dmg)
+
+    def combat(self, ui: str):
+        assert len(self.in_combat_vs) > 0
+        if ui in ["melee", "m"]:
+            self.melee_attack_hostiles()
         elif ui in ["run", "r"]:
             self.gui.main_out.add_line("")
             self.gui.main_out.add_line("You run away!")
@@ -127,9 +128,22 @@ class Game:
         self.player.take_damage(act_dmg)
         self.gui.main_out.add_line("")
 
+    def get_chest_contents(self) -> tuple[Item, int]:
+        return Item("Bullet"), 4
+
     def open_chest(self):
+        # here's the real stuff
         self.current_tile.chests.remove((self.player.x, self.player.y))
-        self.gui.main_out.add_line("You open a chest! There's nothing inside.")
+        item_in_chest, qty_in_chest = self.get_chest_contents()
+        self.player.inventory.add(item_in_chest, qty_in_chest)
+        # here's user feedback
+        plural = get_plural_suffix(item_in_chest.name) if qty_in_chest > 1 else ""
+        it_or_them = "it" if qty_in_chest == 1 else "them"
+        self.gui.main_out.add_line(
+            f"You open a chest - there are {qty_in_chest} {item_in_chest.name}{plural} inside!"
+        )
+        self.gui.main_out.add_line(f"You add {it_or_them} to your inventory.")
+        logger.debug(f"player inventory contents: {self.player.inventory.contents}")
 
     def portal_into_another_dimension(self, dim_num=None):
         if dim_num is None:

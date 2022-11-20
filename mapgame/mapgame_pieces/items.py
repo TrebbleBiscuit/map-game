@@ -1,5 +1,7 @@
 class Item:
-    def __init__(self, name):
+    """Note that items must have unique names"""
+
+    def __init__(self, name: str):
         self.name = name
         self.value = 0
 

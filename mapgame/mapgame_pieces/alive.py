@@ -18,11 +18,10 @@ class LivingThing:
         self.attack_power = 1
 
     def _heal_over_time(self):
-        if self.hp < 20:
-            logger.debug("This living thing is healing over time")
+        if self.hp < self.max_hp:
             self.hp += 1
 
-    def move(self, tile: "map.Tile", direction: str) -> str | None:
+    def move(self, tile: "Tile", direction: str) -> str | None:
         """Attempt to move a given direction
 
         Args:
@@ -66,8 +65,8 @@ class NPC(LivingThing):
 
     @classmethod
     def generate_from_level(cls, level: int) -> "NPC":
-        logger.info(f"Generating level {level} enemy")
-        name = random.choice(["slime", "skeleton", "bad guy"])
+        name = random.choice(["slime", "skeleton", "bad guy", "zombie", "mugger"])
+        logger.info(f"Generating level {level} enemy {name}")
         inst = cls(name)
         inst.max_hp = random.randrange(15, 25) + (level * 5)
         inst.hp = inst.max_hp
