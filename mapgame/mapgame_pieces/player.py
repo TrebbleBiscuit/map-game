@@ -6,42 +6,52 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# type alias
+InventoryContents = dict[str, int]
+ItemMap = dict[str, Item]
+
 
 class Inventory:
     def __init__(self):
         # items must have unique names!
-        self._contents: dict[str, int] = {}  # {Item().name: quantity}
-        self._item_map: dict[str, Item] = {}
+        self._contents: InventoryContents = {}  # {Item().name: quantity}
+        self._item_map: ItemMap = {  # this will be more useful when items are unique
+            "Bullet": Item("Bullet"),
+        }
 
     @property
-    def contents(self):
+    def contents(self) -> InventoryContents:
         # use self.add() and self.remove() to modify contents
         return self._contents
 
     @property
-    def item_map(self):
+    def item_map(self) -> ItemMap:
         return self._item_map
 
-    def add(self, to_add: Item, qty: int = 1):
-        if to_add.name in self.contents:
-            self._contents[to_add.name] += qty
-        self._contents[to_add.name] = qty
-        self._item_map[to_add.name] = to_add
-        logger.info(self._item_map)
+    def get_item_qty(self, item_name: str) -> int:
+        if item_name in self.contents:
+            return self.contents[item_name]
+        return 0
 
-    def remove(self, to_remove: Item, qty: int = 1):
-        if to_remove.name not in self.contents:
+    def add(self, to_add: str, qty: int = 1):
+        logger.debug(f"Adding {qty}x {to_add} to inventory")
+        if to_add in self.contents:
+            self._contents[to_add] += qty
+        self._contents[to_add] = qty
+
+    def remove(self, to_remove: str, qty: int = 1):
+        logger.debug(f"Removing {qty}x {to_remove} from inventory")
+        if to_remove not in self.contents:
             raise ValueError(
-                f"Tried to remove {to_remove.name} from player inventory, but it's not in here"
+                f"Tried to remove {to_remove} from inventory, but it's not in here"
             )
-        self._contents[to_remove.name] -= qty
-        if self.contents[to_remove.name] < 0:
+        self._contents[to_remove] -= qty
+        if self.contents[to_remove] < 0:
             raise ValueError(
-                "Tried to remove more {to_remove.name} from player inventory than exists here"
+                "Tried to remove more {to_remove.name} from inventory than exists here"
             )
-        elif self.contents[to_remove.name] == 0:
-            self._contents.pop(to_remove.name)
-            self._item_map.pop(to_remove.name)
+        elif self.contents[to_remove] == 0:
+            self._contents.pop(to_remove)
 
 
 class Player(LivingThing):
@@ -50,7 +60,8 @@ class Player(LivingThing):
         self.gui = gui
         self.max_hp = 50
         self.hp = self.max_hp
-        self.attack_power = 5
+        self.attack_power = 5  # base melee damage
+        self.gun_aiming = 60  # base chance to hit with gun /100
         self.inventory = Inventory()
         self.money = 0
         self.level = 1
@@ -60,7 +71,7 @@ class Player(LivingThing):
     def grant_xp(self, xp: int):
         self.gui.main_out.add_line(f"You gained {xp} XP!")
         self.xp += xp
-        if self.xp > (50 * self.level):
+        if self.xp > (20 * self.level):
             lvl_txt = color_string(f"You have leveled up!", Fore.GREEN)
             self.gui.main_out.add_line(lvl_txt)
             self.level += 1

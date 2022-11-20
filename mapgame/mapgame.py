@@ -65,7 +65,7 @@ class Game:
 
     def end_combat(self):
         self.gui.main_out.add_line(
-            "You emerge from combat victorious! Time to keep exploring."
+            "With combat behind you for now, it's time to keep exploring."
         )
         self.in_combat_vs = []
         self.game_state = GameState.in_map
@@ -83,17 +83,43 @@ class Game:
             self.gui.main_out.add_line(f"You do ({min_dmg}-{max_dmg}) {dmg_txt}!")
             hostile.take_damage(act_dmg)
 
+    def shoot_attack_hostiles(self):
+        """you know like with a gun"""
+        base_dmg = 12
+        min_dmg = int((base_dmg * 0.5) + 0.5)
+        max_dmg = int(base_dmg * 1.5)
+        act_dmg = random.randint(min_dmg, max_dmg)
+        hit = random.randint(0, 100) <= self.player.gun_aiming
+        hostile = random.choice(self.in_combat_vs)
+        enemy_text = color_string(f"{hostile.name}", "Fore.RED")
+        self.gui.main_out.add_line(f"You aim at the {enemy_text} and pull the trigger!")
+        if hit:
+            dmg_txt = color_string(f"{act_dmg} damage", "Fore.RED")
+            self.gui.main_out.add_line(f"You do ({min_dmg}-{max_dmg}) {dmg_txt}!")
+            hostile.take_damage(act_dmg)
+        else:
+            self.gui.main_out.add_line(f"You miss! ({self.player.gun_aiming}% to hit)")
+
     def combat(self, ui: str):
         assert len(self.in_combat_vs) > 0
         if ui in ["melee", "m"]:
             self.melee_attack_hostiles()
+        elif ui in ["shoot", "s"]:
+            bullet_qty = self.player.inventory.get_item_qty("Bullet")
+            if bullet_qty:
+                self.gui.main_out.add_line(
+                    f"You decide to use one of your {bullet_qty} bullets."
+                )
+                self.player.inventory.remove("Bullet")
+                self.shoot_attack_hostiles()
+            else:
+                self.gui.main_out.add_line("You don't have any ammo!")
+                return
         elif ui in ["run", "r"]:
-            self.gui.main_out.add_line("")
             self.gui.main_out.add_line("You run away!")
             self.end_combat()
             return
         else:
-            self.gui.main_out.add_line("")
             self.gui.main_out.add_line(INVALID_INPUT_MSG)
             return
         # if any hostiles are dead, give xp and update list of hostiles
@@ -128,8 +154,8 @@ class Game:
         self.player.take_damage(act_dmg)
         self.gui.main_out.add_line("")
 
-    def get_chest_contents(self) -> tuple[Item, int]:
-        return Item("Bullet"), 4
+    def get_chest_contents(self) -> tuple[str, int]:
+        return "Bullet", random.randint(2, 5)
 
     def open_chest(self):
         # here's the real stuff
@@ -137,10 +163,10 @@ class Game:
         item_in_chest, qty_in_chest = self.get_chest_contents()
         self.player.inventory.add(item_in_chest, qty_in_chest)
         # here's user feedback
-        plural = get_plural_suffix(item_in_chest.name) if qty_in_chest > 1 else ""
+        plural = get_plural_suffix(item_in_chest) if qty_in_chest > 1 else ""
         it_or_them = "it" if qty_in_chest == 1 else "them"
         self.gui.main_out.add_line(
-            f"You open a chest - there are {qty_in_chest} {item_in_chest.name}{plural} inside!"
+            f"You open a chest - there are {qty_in_chest} {item_in_chest}{plural} inside!"
         )
         self.gui.main_out.add_line(f"You add {it_or_them} to your inventory.")
         logger.debug(f"player inventory contents: {self.player.inventory.contents}")
@@ -211,7 +237,6 @@ class Game:
         """Process a user's input command"""
         # don't want any more lines so the map stays the same, use room_flavor_text instead
         # if room_name == 'portal': Utils.printline(self.stdscr, "You can leave through the portal in this room.")
-        self.gui.main_out.add_line("")
         if not command:
             return
         elif command in ["n", "e", "s", "w"]:
@@ -278,6 +303,7 @@ class Game:
         Returns:
             bool | None: True iff you portal into another dimension
         """
+        self.gui.main_out.add_line("")
         command = sanitize_input(command)
         if self.game_state == GameState.in_map:
             return self.map_turn(command)
