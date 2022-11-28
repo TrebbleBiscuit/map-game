@@ -141,6 +141,7 @@ class Game:
             return
         for hostile in self.in_combat_vs:
             self.hostile_combat_turn(hostile)
+        self.gui.main_out.add_line("")
 
     def hostile_combat_turn(self, hostile: NPC):
         base_dmg = hostile.attack_power
@@ -154,7 +155,6 @@ class Game:
             f"It connects for ({min_dmg}-{max_dmg}) {dmg_txt}!",
         )
         self.player.take_damage(act_dmg)
-        self.gui.main_out.add_line("")
 
     def get_chest_contents(self) -> tuple[str, int]:
         return random.choice(
@@ -296,11 +296,32 @@ class Game:
             "o",
         ]:
             self.open_chest()
+        elif self.get_current_room_name() == "medbay" and command in [
+            "medbay",
+            "med",
+            "heal",
+            "m",
+            "h",
+        ]:
+            if self.player.hp == self.player.max_hp:
+                self.gui.main_out.add_line("You're already at full health!")
+            else:
+                # can only use medbay once
+                self.current_tile.rooms.pop((self.player.x, self.player.y))
+                self.gui.main_out.add_line(
+                    "You use the supplies in the medbay to restore some of your health!"
+                )
+                self.player.recover_hp(int(self.player.max_hp * 0.75))
+                self._progress_time()
         # beyond here lies debug commands
         # elif self.debug and command[:2] == "ff":
         #     self.combat(ct_npc)
         elif self.debug and command[:2] == "xp":
+            self.gui.main_out.add_line("DEBUG: Granting XP")
             self.player.grant_xp(int(command[2:].strip()))
+        elif self.debug and command[:2] == "hp":
+            self.gui.main_out.add_line("DEBUG: Setting HP")
+            self.player.hp = int(command[2:].strip())
         elif self.debug and (command[:2] == "tp" or command[:4] == "tele"):
             self.gui.main_out.add_line('teleport to what coordinates? (i.e. "1, 3")')
             self.gui.main_out.add_line("remember y is inverted")

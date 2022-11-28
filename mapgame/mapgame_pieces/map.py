@@ -16,12 +16,17 @@ class Room:
     map_icon: str
 
 
+RoomMap = dict[tuple[int, int], Room]
+
+
 class Tile:
     def __init__(self, gui, width: int, height: int, level: int):
         self.gui = gui
         self.height = height
         self.width = width
-        self.rooms = self._starting_rooms()
+        self.chests = set()
+        self.rooms: RoomMap = self._starting_rooms()
+        self.add_room(room_name="medbay", map_icon="[m]")
         # {
         #     (0, 0): {
         #         "name": "entrance",
@@ -32,7 +37,6 @@ class Tile:
         #         "map_icon": "[p]",
         #     },  # default for now
         # }
-        self.chests = set()
         self.spawn_chests()
         self.explored: set[tuple[int, int]] = set(
             [(0, 0)]
@@ -46,13 +50,19 @@ class Tile:
             npc.x, npc.y = self.gen_random_coordinates()
             logger.debug(f"NPC spawned at {(npc.x, npc.y)}")
 
-    def _starting_rooms(self) -> dict[tuple[int, int], Room]:
+    def _starting_rooms(self) -> RoomMap:
         rooms = {}
         rooms[(0, 0)] = Room(x=0, y=0, name="entrance", map_icon="[e]")
-        rooms[(self.width - 1, 0)] = Room(
-            x=self.width - 1, y=0, name="portal", map_icon="[p]"
+        # portal always at fixed X but vary the Y
+        portal_y = random.randint(0, self.height - 1)
+        rooms[(self.width - 1, portal_y)] = Room(
+            x=self.width - 1, y=portal_y, name="portal", map_icon="[p]"
         )
         return rooms
+
+    def add_room(self, room_name: str, map_icon: str):
+        cx, cy = self.gen_random_coordinates()
+        self.rooms[(cx, cy)] = Room(x=cx, y=cy, name=room_name, map_icon=map_icon)
 
     def gen_random_coordinates(self) -> tuple[int, int]:
         """Does not select coordinates with existing rooms or chests"""
@@ -86,6 +96,10 @@ class Tile:
                     f"You can {leave_txt} through the portal in this room.",
                 )
                 # TODO: cleared?
+            elif room_name == "medbay":
+                self.gui.main_out.add_line(
+                    f"You can 'heal' in the medbay here.",
+                )
         except KeyError:
             # empty room
             self.gui.main_out.add_line(f"You stand in an empty room.")

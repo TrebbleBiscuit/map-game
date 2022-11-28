@@ -148,7 +148,7 @@ class Player(LivingThing):
                 "Suddenly a feeling of malicious power overwhelms you! You feel refreshed, but at what cost?"
             )
             self.humanity -= 1
-            self.recover_hp(self.max_hp)
+            self.recover_hp(int(self.max_hp * 0.9))
             if self.humanity <= 0:
                 self.gui.main_out.add_line("humanity <= 0; GAME OVER")
                 raise NotImplementedError("Game Over")
