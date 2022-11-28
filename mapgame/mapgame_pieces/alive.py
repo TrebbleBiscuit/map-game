@@ -68,10 +68,12 @@ class NPC(LivingThing):
         name = random.choice(["slime", "skeleton", "bad guy", "zombie", "mugger"])
         logger.info(f"Generating level {level} enemy {name}")
         inst = cls(name)
-        inst.max_hp = random.randrange(15, 25) + (level * 5)
+        hp_modifier = random.randint(10, 25)
+        inst.max_hp = hp_modifier + (level * 5)
         inst.hp = inst.max_hp
-        inst.attack_power = 2 + level
-        inst.xp_reward = (level + 1) * 2
+        attack_modifier = random.randint(0, 2)
+        inst.attack_power = level + attack_modifier
+        inst.xp_reward = (level * 2) + attack_modifier + int(hp_modifier / 7)
         # inst.attack_type = random.choice(['ranged', 'melee'])
         return inst
 

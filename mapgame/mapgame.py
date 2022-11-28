@@ -23,7 +23,7 @@ class Game:
     def __init__(self):
         self.gui = GUIWrapper(game=self)
         self.player = Player(self.gui)
-        self.map = Map(self.gui, 8, 4)
+        self.map = Map(self.gui, 8, 4, self.player.level)
         self.current_tile = self.map.tiles[0]  # self.map.tiles[self.player.tile_index]
         self.time: int = 0
         # self.x = 0
@@ -34,7 +34,8 @@ class Game:
         self.gui.run()
 
     def _progress_time(self):
-        self.player._heal_over_time()
+        if random.randint(1, 6) == 1:
+            self.player._heal_over_time()
         self.time += 1
         for npc in self.current_tile.npcs:
             npc._on_time_pass(self.current_tile)
@@ -128,6 +129,7 @@ class Game:
             if hostile.is_dead:
                 out_of_combat.append(hostile)
                 self.player.grant_xp(hostile.xp_reward)
+                self.player.grant_money(random.randint(1, hostile.xp_reward))
             elif hostile.player_attitude > 0:
                 out_of_combat.append(hostile)
                 logger.info(f"{hostile.name} exits combat because attitude is high")
@@ -155,23 +157,42 @@ class Game:
         self.gui.main_out.add_line("")
 
     def get_chest_contents(self) -> tuple[str, int]:
-        return "Bullet", random.randint(2, 5)
+        return random.choice(
+            [
+                ("Bullet", random.randint(2, 5)),
+                (
+                    "money",
+                    random.randint(self.player.level + 2, (self.player.level + 2) * 2),
+                ),
+            ]
+        )
+        return
 
     def open_chest(self):
         # here's the real stuff
         self.current_tile.chests.remove((self.player.x, self.player.y))
         item_in_chest, qty_in_chest = self.get_chest_contents()
+        if item_in_chest == "money":
+            self.gui.main_out.add_line(
+                f"You open a chest - there is ${qty_in_chest} inside!"
+            )
+            self.player.money += qty_in_chest
+            return
         self.player.inventory.add(item_in_chest, qty_in_chest)
         # here's user feedback
         plural = get_plural_suffix(item_in_chest) if qty_in_chest > 1 else ""
         it_or_them = "it" if qty_in_chest == 1 else "them"
+        are_or_is = "is" if qty_in_chest == 1 else "are"
         self.gui.main_out.add_line(
-            f"You open a chest - there are {qty_in_chest} {item_in_chest}{plural} inside!"
+            f"You open a chest - there {are_or_is} {qty_in_chest} {item_in_chest}{plural} inside!"
         )
         self.gui.main_out.add_line(f"You add {it_or_them} to your inventory.")
         logger.debug(f"player inventory contents: {self.player.inventory.contents}")
 
     def portal_into_another_dimension(self, dim_num=None):
+        # heal up to ~15% health
+        self.player.heal_up_to(int(self.player.max_hp / 6))
+        self.player.save_to_file()
         if dim_num is None:
             dim_num = self.player.tile_index + 1
         else:
@@ -186,7 +207,9 @@ class Game:
                 color_string("This dimension needed to be generated", "Style.BRIGHT")
             )
             self.player.grant_xp(dim_num * 2)
-            self.current_tile = self.map.get_tile(dim_num)
+            self.current_tile = self.map.get_tile(
+                dim_num, player_level=self.player.level
+            )
 
         finally:
             self.player.x, self.player.y = (0, 0)
@@ -213,8 +236,9 @@ class Game:
     def turn_prompt(self):
         """Prompt the user to enter a command"""
         # self.stdscr.clrtobot()
+        self.gui.update_stats()
         if self.game_state == GameState.in_map:
-            self.gui.main_out.add_line("What direction do you want to move? [n/e/s/w] ")
+            self.gui.main_out.add_line("What direction do you want to move? [n/e/s/w]")
         elif self.game_state == GameState.in_combat:
             for hostile in self.in_combat_vs:
                 enemy_text = color_string(f"{hostile.name}", "Fore.RED")
@@ -243,11 +267,14 @@ class Game:
             player_move = self.player.move(self.current_tile, command)
             if player_move:  # move successful
                 self.gui.main_out.add_line(f"You move {player_move}.")
+                if (self.player.x, self.player.y) not in self.current_tile.explored:
+                    # heal when entering new rooms
+                    self.player._heal_over_time()
                 self.current_tile.explored.add((self.player.x, self.player.y))
                 self.current_tile.room_flavor_text((self.player.x, self.player.y))
                 if (self.player.x, self.player.y) in self.current_tile.chests:
                     self.gui.main_out.add_line(
-                        "There's a chest in this room! You wonder what's inside!"
+                        "There's a chest in this room! 'open' it to see what's inside."
                     )
                 self._progress_time()
                 # TODO: print flavor text for room

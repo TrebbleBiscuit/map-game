@@ -5,6 +5,7 @@ import random
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
+NUMBER_OF_NPCS_PER_TILE = 7
 
 
 @dataclass
@@ -16,7 +17,7 @@ class Room:
 
 
 class Tile:
-    def __init__(self, gui, width: int, height: int):
+    def __init__(self, gui, width: int, height: int, level: int):
         self.gui = gui
         self.height = height
         self.width = width
@@ -38,7 +39,9 @@ class Tile:
         )  # had to put the tuple in a list to get it to turn into a set of tuples
         self.paths = self.generate_paths(self.width * self.height)
         self.all_visible = False
-        self.npcs = [NPC.generate_from_level(1) for x in range(6)]
+        self.npcs = [
+            NPC.generate_from_level(level) for x in range(NUMBER_OF_NPCS_PER_TILE)
+        ]
         for npc in self.npcs:
             npc.x, npc.y = self.gen_random_coordinates()
             logger.debug(f"NPC spawned at {(npc.x, npc.y)}")
@@ -77,7 +80,7 @@ class Tile:
             self.gui.main_out.add_line(f"You stand in the {room_name} room!")
             if room_name == "portal":
                 # leave_txt = Utils.color_string(f"leave", Fore.MAGENTA)
-                leave_txt = "*leave*"
+                leave_txt = "leave"
                 # portal_txt = Utils.color_string(f"leave", Style.BRIGHT)
                 self.gui.main_out.add_line(
                     f"You can {leave_txt} through the portal in this room.",
@@ -261,13 +264,13 @@ class Tile:
 
 
 class Map:
-    def __init__(self, gui, width, height):
+    def __init__(self, gui, width, height, player_level):
         self.default_height = height
         self.default_width = width
         self.gui = gui
-        self.tiles = [Tile(self.gui, width, height)]  # ordered list
+        self.tiles = [Tile(self.gui, width, height, level=player_level)]  # ordered list
 
-    def get_tile(self, tile_num: int) -> Tile:
+    def get_tile(self, tile_num: int, player_level: int) -> Tile:
         """Get this tile number; create it if it doesn't exist
         Note tile numbers are indexed starting from 1
         """
@@ -279,6 +282,11 @@ class Map:
             logger.debug("Creating %s new dimension(s)", num_to_create)
             for x in range(num_to_create):
                 self.tiles.append(
-                    Tile(self.gui, self.default_width, self.default_height)
+                    Tile(
+                        self.gui,
+                        self.default_width,
+                        self.default_height,
+                        level=player_level,
+                    )
                 )
             return self.tiles[tile_num - 1]

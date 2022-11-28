@@ -4,41 +4,6 @@ from textual.app import App, ComposeResult
 from textual.widgets import Header, Footer, Static, Input
 
 
-hellos = cycle(
-    [
-        "Howdy",
-        "Sup",
-        "Yo",
-        "Greetings",
-        "Hello",
-    ]
-)
-
-
-class Hello(Static):
-    """Display a greeting."""
-
-    DEFAULT_CSS = """
-    Hello {
-        padding: 1 2;
-        background: $panel;
-        border: $secondary tall;
-        content-align: center middle;
-    }
-    """
-
-    def on_mount(self) -> None:
-        self.next_word()
-
-    # def on_click(self) -> None:
-    #     self.next_word()
-
-    def next_word(self) -> None:
-        """Get a new hello and update the content area."""
-        hello = next(hellos)
-        self.update(f"{hello}, [b]World[/b]!")
-
-
 class OutputWindow(Static):
     def add_line(self, new_content: str):
         old_content = self.render()
@@ -66,7 +31,7 @@ class GUIWrapper(App):
 
     def __init__(self, game):
         super().__init__()
-        self.my_hello = Hello("Misc Info", classes="box")
+        self.stats_out = Static("Stats", classes="box")
         self.main_out = OutputWindow("Welcome to mapgame!", classes="box", id="tallboi")
         self.map_out = Static("Map", classes="box")
         self.main_in = Input(
@@ -81,7 +46,7 @@ class GUIWrapper(App):
         yield self.map_out
         yield self.main_out
         # yield Hello("Misc Info", classes="box")
-        yield self.my_hello
+        yield self.stats_out
         # yield Static("Input", classes="box", id="longboi")
         yield self.main_in
         # yield Static("4", classes="box")
@@ -99,6 +64,15 @@ class GUIWrapper(App):
             self.game.current_tile.get_map(self.game.player.x, self.game.player.y)
         )
         self.map_out.update(map_now)
+
+    def update_stats(self):
+        stats = f"HP: {self.game.player.hp}/{self.game.player.max_hp}"
+        stats += f"\nMoney: {self.game.player.money}"
+        stats += f"\nLevel: {self.game.player.level}"
+        stats += f"\nXP: {self.game.player.xp}"
+        stats += f"\nHumanity: {self.game.player.humanity}"
+        stats += f"\nInv: {self.game.player.inventory.contents}"
+        self.stats_out.update(stats)
 
     async def on_input_submitted(self, message: Input.Submitted):
         # logger.debug("Input submitted: %s", message.value)
