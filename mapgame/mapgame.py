@@ -208,9 +208,6 @@ class Game:
             self.current_tile = self.map.tiles[dim_num]
             self.gui.main_out.add_line("This dimension already existed")
         except IndexError:
-            self.gui.main_out.add_line(
-                color_string("This dimension needed to be generated", "Style.BRIGHT")
-            )
             self.player.grant_xp(dim_num * 2)
             self.current_tile = self.map.get_tile(
                 dim_num, player_level=self.player.level
