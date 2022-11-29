@@ -52,6 +52,21 @@ class Game:
         #     #     uinput = input(self.wm.stdscr, "you gotta type ok to continue!")
 
     def enter_combat(self, hostiles: list[NPC]):
+        # update GUI
+        gui_choices = [
+            "Try not to panic",
+            "Keep it cool, you've got this",
+            "Show 'em what you're made of",
+            "Heroism is endurance for one moment more",
+            "Only the dead have seen the end of war.",
+            "Aim towards the Enemy.",
+            "Try to look unimportant; they may be low on ammo.",
+            "All warfare is based on deception.",
+        ]
+        if random.random() < 0.2:
+            gui_choices.append("psssh...nothing personnel...kid...")
+            gui_choices.append("What is this, some kind of map-game?")
+        self.gui.main_in.placeholder = random.choice(gui_choices)
         if self.in_combat_vs:
             raise RuntimeError(
                 f"Attempted to enter combat, but player is already fighting: {self.in_combat_vs}"
@@ -67,6 +82,7 @@ class Game:
             self.gui.main_out.add_line(f"\nEntered combat with hostiles: {enemy_text}!")
 
     def end_combat(self):
+        self.gui.main_in.placeholder = self.gui.default_input_placeholder
         self.gui.main_out.add_line(
             "With combat behind you for now, it's time to keep exploring."
         )

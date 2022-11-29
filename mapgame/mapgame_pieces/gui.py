@@ -33,8 +33,9 @@ class GUIWrapper(App):
         self.stats_out = Static("Stats", classes="box")
         self.main_out = OutputWindow("Welcome to mapgame!", classes="box", id="tallboi")
         self.map_out = Static("Map", classes="box")
+        self.default_input_placeholder = "Type a command and press enter"
         self.main_in = Input(
-            placeholder="Type a command and press enter", classes="box", id="longboi"
+            placeholder=self.default_input_placeholder, classes="box", id="longboi"
         )
         self.game = game
 
