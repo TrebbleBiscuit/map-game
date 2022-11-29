@@ -157,16 +157,14 @@ class Game:
         self.player.take_damage(act_dmg)
 
     def get_chest_contents(self) -> tuple[str, int]:
-        return random.choice(
-            [
-                ("Bullet", random.randint(2, 5)),
-                (
-                    "money",
-                    random.randint(self.player.level + 2, (self.player.level + 2) * 2),
-                ),
-            ]
-        )
-        return
+        choices = [
+            ("Bullet", random.randint(3, self.player.level + 3)),
+            (
+                "money",
+                random.randint(self.player.level + 2, (self.player.level + 2) * 2),
+            ),
+        ]
+        return random.choice(choices)
 
     def open_chest(self):
         # here's the real stuff
@@ -238,6 +236,11 @@ class Game:
         # self.stdscr.clrtobot()
         self.gui.update_stats()
         if self.game_state == GameState.in_map:
+            self.current_tile.room_flavor_text((self.player.x, self.player.y))
+            if (self.player.x, self.player.y) in self.current_tile.chests:
+                self.gui.main_out.add_line(
+                    "There's a chest in this room! 'open' it to see what's inside."
+                )
             self.gui.main_out.add_line("What direction do you want to move? [n/e/s/w]")
         elif self.game_state == GameState.in_combat:
             for hostile in self.in_combat_vs:
@@ -249,6 +252,10 @@ class Game:
             self.gui.main_out.add_line(
                 f"You can {color_string('melee', 'Fore.RED')} attack, or attempt to {color_string('run', 'Fore.CYAN')}.",
             )
+            if self.player.inventory.get_item_qty("Bullet") > 0:
+                self.gui.main_out.add_line(
+                    f"You can also try to shoot an enemy ({self.player.gun_aiming}%)"
+                )
         else:
             raise ValueError(f"Invalid Game State '{self.game_state}'")
 
@@ -271,11 +278,7 @@ class Game:
                     # heal when entering new rooms
                     self.player._heal_over_time()
                 self.current_tile.explored.add((self.player.x, self.player.y))
-                self.current_tile.room_flavor_text((self.player.x, self.player.y))
-                if (self.player.x, self.player.y) in self.current_tile.chests:
-                    self.gui.main_out.add_line(
-                        "There's a chest in this room! 'open' it to see what's inside."
-                    )
+                # self.current_tile.room_flavor_text((self.player.x, self.player.y))
                 self._progress_time()
                 # TODO: print flavor text for room
             else:
@@ -290,12 +293,15 @@ class Game:
             self.gui.main_out.add_line("You take the portal into the next dimension...")
             self.portal_into_another_dimension()
             return True  # don't loop
-        elif (self.player.x, self.player.y) in self.current_tile.chests and command in [
+        elif command in [
             "open",
             "chest",
             "o",
         ]:
-            self.open_chest()
+            if (self.player.x, self.player.y) in self.current_tile.chests:
+                self.open_chest()
+            else:
+                self.gui.main_out.add_line("There's no chest here to open!")
         elif self.get_current_room_name() == "medbay" and command in [
             "medbay",
             "med",
