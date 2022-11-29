@@ -21,13 +21,16 @@ Or: `python mapgame/mapgame.py`
 ### What do you do in game
 
 - Walk around by typing a direction `north`/`n`, `east`/`e`, etc.
-- Pay attention to on-screen prompts to `open` chests, `heal` in a medbay, etc
+- Pay attention to on-screen prompts to `open` chests, `heal` in the medbay, etc
 - Find and enter the portal (towards the east) to save the game and progress to the next area
-- Fight enemies that roam around for XP
+- `melee` or `shoot` enemies that roam around for XP
 - Level up to increase strength and max HP
 - Collect coins to impress and amaze your friends
 
 ##### Tips
 
+- If your HP drops to zero, you'll get most of it back - at the cost of some humanity
+- Restore humanity by leveling up and entering the portal
 - You heal 1 HP every time you enter an unexplored room
 - Enemies that get to a chest before you will steal its loot and get stronger
+- If you `run` from combat, you lose nothing but your pride
