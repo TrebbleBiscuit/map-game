@@ -7,7 +7,6 @@ from mapgame_pieces.map import Map
 from mapgame_pieces.utils import color_string, sanitize_input, get_plural_suffix
 from enum import Enum
 from mapgame_pieces.gui import GUIWrapper
-from mapgame_pieces.gui import MAP_WIDTH, MAP_HEIGHT
 from mapgame_pieces.items import Item
 
 logger = logging.getLogger(__name__)
