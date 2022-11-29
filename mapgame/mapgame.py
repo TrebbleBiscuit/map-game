@@ -7,11 +7,14 @@ from mapgame_pieces.map import Map
 from mapgame_pieces.utils import color_string, sanitize_input, get_plural_suffix
 from enum import Enum
 from mapgame_pieces.gui import GUIWrapper
+from mapgame_pieces.gui import MAP_WIDTH, MAP_HEIGHT
 from mapgame_pieces.items import Item
 
 logger = logging.getLogger(__name__)
 
 INVALID_INPUT_MSG = color_string("Input not understood", "Style.DIM")
+MAP_WIDTH = 8
+MAP_HEIGHT = 4
 
 
 class GameState(Enum):
@@ -23,7 +26,7 @@ class Game:
     def __init__(self):
         self.gui = GUIWrapper(game=self)
         self.player = Player(self.gui)
-        self.map = Map(self.gui, 8, 4, self.player.level)
+        self.map = Map(self.gui, MAP_WIDTH, MAP_HEIGHT, self.player.level)
         self.current_tile = self.map.tiles[0]  # self.map.tiles[self.player.tile_index]
         self.time: int = 0
         # self.x = 0

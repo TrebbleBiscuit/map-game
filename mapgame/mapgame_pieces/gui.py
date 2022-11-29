@@ -27,7 +27,7 @@ class OutputWindow(Static):
 class GUIWrapper(App):
 
     BINDINGS = [("d", "toggle_dark", "Toggle dark mode")]
-    CSS_PATH = "horizontal_layout.css"
+    CSS_PATH = "mapgui.css"
 
     def __init__(self, game):
         super().__init__()
