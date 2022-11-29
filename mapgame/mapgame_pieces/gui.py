@@ -26,7 +26,6 @@ class OutputWindow(Static):
 
 class GUIWrapper(App):
 
-    BINDINGS = [("d", "toggle_dark", "Toggle dark mode")]
     CSS_PATH = "mapgui.css"
 
     def __init__(self, game):
@@ -41,15 +40,11 @@ class GUIWrapper(App):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield Footer()
-        # yield Welcome()
+        # yield Footer()
         yield self.map_out
         yield self.main_out
-        # yield Hello("Misc Info", classes="box")
         yield self.stats_out
-        # yield Static("Input", classes="box", id="longboi")
         yield self.main_in
-        # yield Static("4", classes="box")
 
     def on_mount(self):
         map_now = markup.escape(
@@ -80,7 +75,3 @@ class GUIWrapper(App):
         self.update_map()
         self.main_in.value = ""
         self.game.turn_prompt()
-
-    def action_toggle_dark(self) -> None:
-        """An action to toggle dark mode."""
-        self.dark = not self.dark
