@@ -15,7 +15,7 @@ ItemMap = dict[str, Item]
 EquippedMap = dict[str, Item | None]
 
 
-SAVE_PATH = Path("mapgame.save")
+SAVE_PATH = Path("mapgame.mapsave")
 logger = logging.getLogger(__name__)
 
 

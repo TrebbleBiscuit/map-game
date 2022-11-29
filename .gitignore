@@ -2,4 +2,4 @@
 *.log
 *.pyc
 .vscode
-mapgame.save
+*.mapsave
