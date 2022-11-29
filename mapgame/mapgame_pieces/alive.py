@@ -77,7 +77,7 @@ class NPC(LivingThing):
         # inst.attack_type = random.choice(['ranged', 'melee'])
         return inst
 
-    def will_attack_player(self):
+    def will_attack_player(self) -> bool:
         if not self.is_dead and self.player_attitude <= 0:
             return True
         return False
@@ -87,7 +87,11 @@ class NPC(LivingThing):
         if (self.x, self.y) in tile.chests:
             logger.debug(f"NPC {self.name} opened a chest at {(self.x, self.y)}")
             tile.chests.remove((self.x, self.y))
+            self.max_hp = int(self.max_hp * 1.09)
         elif self.wander:
+            if random.random() < 0.4:
+                # chance to not wander
+                return
             move_options = ["n", "s", "e", "w"]
             random.shuffle(move_options)
             mv_choice = move_options.pop()

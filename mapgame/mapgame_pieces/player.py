@@ -77,7 +77,6 @@ class Player(LivingThing):
         self.max_hp = 30
         self.hp = self.max_hp
         self.attack_power = 4  # base melee damage
-        self.gun_aiming = 60  # base chance to hit with gun /100
         self.inventory = Inventory()
         self.money = 0
         self.level = 1
@@ -85,6 +84,11 @@ class Player(LivingThing):
         self.humanity = 100  # out of 100
         if SAVE_PATH.exists():
             self.load_from_file()
+
+    @property
+    def gun_aiming(self) -> int:
+        base_chance = 60
+        return min(base_chance + self.level, 100)
 
     def save_to_file(self):
         logger.debug("Saving to %s", SAVE_PATH)
@@ -132,6 +136,9 @@ class Player(LivingThing):
             # heal up to ~15% health
             self.heal_up_to(int(self.max_hp / 6))
 
+            # invisible buffs
+            self.humanity += 1
+
     def grant_money(self, money: int):
         self.gui.main_out.add_line(f"You gained {money} money!")
         self.money += money
@@ -141,17 +148,20 @@ class Player(LivingThing):
         self.gui.main_out.add_line(f"{ouch}! You take {dmg} damage!")
         self.hp -= dmg
         if self.hp <= 0:
+            self.hp = 0  # maybe rm this? the idea of overkill affecting your next hp pool is cool
             self.gui.main_out.add_line(
                 "Your HP drops to zero! You collapse to your knees, feeling weak..."
             )
             self.gui.main_out.add_line(
                 "Suddenly a feeling of malicious power overwhelms you! You feel refreshed, but at what cost?"
             )
-            self.humanity -= 1
+            self.humanity -= 10
             self.recover_hp(int(self.max_hp * 0.9))
             if self.humanity <= 0:
                 self.gui.main_out.add_line("humanity <= 0; GAME OVER")
-                raise NotImplementedError("Game Over")
+                self.gui.main_out.add_line(
+                    "delete your save file if you want, or just keep playing"
+                )
 
     def recover_hp(self, rec: int):
         hp_missing = self.max_hp - self.hp

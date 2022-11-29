@@ -86,7 +86,7 @@ class Game:
 
     def shoot_attack_hostiles(self):
         """you know like with a gun"""
-        base_dmg = 12
+        base_dmg = 10 + self.player.level
         min_dmg = int((base_dmg * 0.5) + 0.5)
         max_dmg = int(base_dmg * 1.5)
         act_dmg = random.randint(min_dmg, max_dmg)
@@ -117,9 +117,14 @@ class Game:
                 self.gui.main_out.add_line("You don't have any ammo!")
                 return
         elif ui in ["run", "r"]:
-            self.gui.main_out.add_line("You run away!")
-            self.end_combat()
-            return
+            success_chance = 0.8
+            if random.random() < success_chance:
+                self.gui.main_out.add_line("You run away!")
+                self.end_combat()
+                return
+            self.gui.main_out.add_line(
+                f"You try to run away ({success_chance}%), but aren't quick enough this time!"
+            )
         else:
             self.gui.main_out.add_line(INVALID_INPUT_MSG)
             return
@@ -158,7 +163,7 @@ class Game:
 
     def get_chest_contents(self) -> tuple[str, int]:
         choices = [
-            ("Bullet", random.randint(3, self.player.level + 3)),
+            ("Bullet", random.randint(3, int(self.player.level / 2) + 3)),
             (
                 "money",
                 random.randint(self.player.level + 2, (self.player.level + 2) * 2),
