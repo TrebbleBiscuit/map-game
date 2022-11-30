@@ -65,16 +65,22 @@ class NPC(LivingThing):
 
     @classmethod
     def generate_from_level(cls, level: int) -> "NPC":
+        if random.random() < 0.2:
+            level += 1
         name = random.choice(["slime", "skeleton", "bad guy", "zombie", "mugger"])
         logger.info(f"Generating level {level} enemy {name}")
         inst = cls(name)
-        hp_modifier = random.randint(10, 25)
-        inst.max_hp = hp_modifier + (level * 5)
+        hp_base = random.randint(15, 20)
+        hp_level_multi = random.uniform(4.5, 5.5)
+        inst.max_hp = hp_base + int(level * hp_level_multi)
         inst.hp = inst.max_hp
-        attack_modifier = random.randint(0, 2)
+        attack_modifier = random.randint(1, 3) + random.randint(
+            0, random.randint(1, level)
+        )
         inst.attack_power = level + attack_modifier
-        inst.xp_reward = (level * 2) + attack_modifier + int(hp_modifier / 7)
+        inst.xp_reward = inst.attack_power + int(inst.max_hp / 7)
         # inst.attack_type = random.choice(['ranged', 'melee'])
+        inst.tile_index = level
         return inst
 
     def will_attack_player(self) -> bool:
@@ -105,10 +111,8 @@ class NPC(LivingThing):
                     return False
             logger.debug(f"{self.name} moved {mv_choice} to {(self.x, self.y)}")
 
-    def take_damage(self, dmg: int):
+    def take_damage(self, dmg: int) -> bool:
         self.hp -= dmg
         if self.hp <= 0:
-            logger.debug(
-                "It falls to the ground in a heap, then disappears in a flash of light!",
-            )
             self.is_dead = True
+        return self.is_dead

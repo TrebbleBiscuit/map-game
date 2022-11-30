@@ -5,7 +5,7 @@ import random
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
-NUMBER_OF_NPCS_PER_TILE = 7
+BASE_NPCS_PER_TILE = 7
 
 
 @dataclass
@@ -43,9 +43,8 @@ class Tile:
         )  # had to put the tuple in a list to get it to turn into a set of tuples
         self.paths = self.generate_paths(self.width * self.height)
         self.all_visible = False
-        self.npcs = [
-            NPC.generate_from_level(level) for x in range(NUMBER_OF_NPCS_PER_TILE)
-        ]
+        number_of_npcs = BASE_NPCS_PER_TILE + min(int(level / 6), 3)
+        self.npcs = [NPC.generate_from_level(level) for x in range(number_of_npcs)]
         for npc in self.npcs:
             npc.x, npc.y = self.gen_random_coordinates()
             logger.debug(f"NPC spawned at {(npc.x, npc.y)}")
@@ -278,14 +277,24 @@ class Tile:
 
 
 class Map:
-    def __init__(self, gui, width, height, player_level):
+    def __init__(self, gui, width, height):
         self.default_height = height
         self.default_width = width
         self.gui = gui
-        self.tiles = [Tile(self.gui, width, height, level=player_level)]  # ordered list
+        self.tiles = [self.get_tile(1)]  # ordered list
 
-    def get_tile(self, tile_num: int, player_level: int) -> Tile:
-        """Get this tile number; create it if it doesn't exist
+    def get_tile(self, level: int) -> Tile:
+        """Generate a tile with NPCs at a particular level"""
+        return Tile(
+            self.gui,
+            self.default_width,
+            self.default_height,
+            level=level,
+        )
+
+    def generate_each_dimension(self, tile_num: int) -> Tile:
+        """OLD get_tile() DEPRECIATED when i realized it would be a pain to save/load this
+        Get this tile number; create it if it doesn't exist
         Note tile numbers are indexed starting from 1
         """
         try:
@@ -300,7 +309,7 @@ class Map:
                         self.gui,
                         self.default_width,
                         self.default_height,
-                        level=player_level,
+                        level=tile_num,
                     )
                 )
             return self.tiles[tile_num - 1]

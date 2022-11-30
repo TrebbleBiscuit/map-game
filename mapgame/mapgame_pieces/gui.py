@@ -4,6 +4,13 @@ from textual.app import App, ComposeResult
 from textual.widgets import Header, Footer, Static, Input
 
 
+def make_15_chars_long(string: str) -> str:
+    n_spaces = 15 - len(string)
+    if n_spaces < 0:
+        raise ValueError(f"Input string is too long: '{string}'")
+    return string + n_spaces * " "
+
+
 class OutputWindow(Static):
     def add_line(self, new_content: str):
         old_content = self.render()
@@ -62,12 +69,18 @@ class GUIWrapper(App):
         self.map_out.update(map_now)
 
     def update_stats(self):
-        stats = f"HP: {self.game.player.hp}/{self.game.player.max_hp}"
-        stats += f"\nMoney: {self.game.player.money}"
-        stats += f"\nLevel: {self.game.player.level}"
-        stats += f"\nXP: {self.game.player.xp}"
-        stats += f"\nHumanity: {self.game.player.humanity}"
-        stats += f"\nInv: {self.game.player.inventory.contents}"
+        stats = make_15_chars_long(
+            f"HP: {self.game.player.hp}/{self.game.player.max_hp}"
+        )
+        stats += make_15_chars_long(f"Humanity: {self.game.player.humanity}")
+        stats += "\n"
+        stats += make_15_chars_long(f"XP: {self.game.player.xp}")
+        stats += make_15_chars_long(f"Money: {self.game.player.money}")
+        stats += "\n"
+        stats += make_15_chars_long(f"Level: {self.game.player.level}")
+        stats += make_15_chars_long(f"Depth: {self.game.player.tile_index}")
+        stats += "\n"
+        stats += f"Inv: {self.game.player.inventory.contents}"
         self.stats_out.update(stats)
 
     async def on_input_submitted(self, message: Input.Submitted):
