@@ -28,7 +28,6 @@ class GameState(Enum):
 class CurrentInteraction:
     in_combat_vs: list[NPC] = field(default_factory=list)
     in_conversation_with: NPC | None = None
-    conversation: Conversation | None = None
 
 
 class Game:
@@ -67,19 +66,14 @@ class Game:
                 f"Attempted to enter conversation, but player is already speaking with: {self.interaction.in_conversation_with}"
             )
 
-        self.gui.main_out.add_line(
-            f"The friendly {npc.name} in this room strikes up a conversation with you!"
-        )
         self.game_state = GameState.in_conversation
         self.interaction.in_conversation_with = npc
-        self.interaction.conversation = RiddleConvo(self.player)
 
     def end_conversation(self):
         self.gui.main_in.placeholder = self.gui.default_input_placeholder
         self.gui.main_out.add_line("Time to continue exploring.")
         self.game_state = GameState.in_map
         self.interaction.in_conversation_with = None
-        self.interaction.conversation = None
 
     def enter_combat(self, hostiles: list[NPC]):
         # update GUI
@@ -271,17 +265,28 @@ class Game:
     def maybe_enter_combat(self):
         # Should we encounter an NPC?
         attacking_npcs = []
+        other_npcs = []
         for ct_npc in self.current_tile.npcs:
             if not ct_npc.is_dead and ct_npc.coordinates == self.player.coordinates:
                 if ct_npc.will_attack_player():
                     attacking_npcs.append(ct_npc)
                 else:
-                    self.gui.main_out.add_line(
-                        f"There is a friendly {ct_npc.name} in this room!"
-                    )
-                    self.enter_conversation(ct_npc)
+                    other_npcs.append(ct_npc)
         if attacking_npcs:
             self.enter_combat(attacking_npcs)
+        elif other_npcs:
+            for ct_npc in other_npcs:
+                # for when there are multiple npcs
+                self.gui.main_out.add_line(
+                    f"There is a friendly {ct_npc.name} in this room!"
+                )
+            conversation_npcs = [x for x in other_npcs if not x.conversation.has_ended]
+            if conversation_npcs:
+                convo_npc = random.choice(conversation_npcs)
+                self.gui.main_out.add_line(
+                    f"The friendly {convo_npc.name} in this room strikes up a conversation with you!"
+                )
+                self.enter_conversation(convo_npc)
 
     def turn_prompt(self):
         """Prompt the user to enter a command"""
@@ -319,7 +324,9 @@ class Game:
                     f"You can also try to shoot an enemy ({self.player.gun_aiming}%)"
                 )
         elif self.game_state == GameState.in_conversation:
-            self.interaction.conversation.prompt()
+            assert self.interaction.in_conversation_with
+            out = self.interaction.in_conversation_with.conversation.prompt()
+            self.gui.main_out.add_line(out)
         else:
             raise ValueError(f"Invalid Game State '{self.game_state}'")
 
@@ -383,6 +390,24 @@ class Game:
                 )
                 self.player.recover_hp(int(self.player.max_hp * 0.75))
                 self._progress_time()
+
+        elif command in ["talk", "conversation", "speak"]:
+            friendly_npcs = [
+                x
+                for x in self.current_tile.npcs
+                if not x.is_dead and x.coordinates == self.player.coordinates
+            ]
+            if friendly_npcs:
+                this_npc = friendly_npcs[0]
+                self.gui.main_out.add_line(
+                    f"You strike up a conversation with the friendly {this_npc.name}."
+                )
+                self.enter_conversation(this_npc)
+                # return so that we don't check for combat and other conversations after this
+                return
+            else:
+                self.gui.main_out.add_line(INVALID_INPUT_MSG)
+                return
         # beyond here lies debug commands
         # elif self.debug and command[:2] == "ff":
         #     self.combat(ct_npc)
@@ -435,8 +460,10 @@ class Game:
             case GameState.in_combat:
                 return self.combat(command)
             case GameState.in_conversation:
-                convo = self.interaction.conversation
-                convo.respond(command)
+                convo = self.interaction.in_conversation_with.conversation
+                assert convo
+                out = convo.respond(self.player, command)
+                self.gui.main_out.add_line(out)
                 if convo.has_ended:
                     self.end_conversation()
             case _:

@@ -1,5 +1,6 @@
 import random
 import logging
+from mapgame_pieces.conversations import Conversation, TestConversation, RiddleConvo
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +67,20 @@ class NPC(LivingThing):
         self.xp_reward = 0
         self.wander = True
         self.is_dead = False
+
+    @property
+    def conversation(self) -> Conversation | None:
+        try:
+            return self._conversation
+        except AttributeError:
+            self._conversation = self.create_conversation()
+            return self._conversation
+
+    def create_conversation(self) -> Conversation:
+        if random.random() < 0.5:
+            return RiddleConvo(self)
+        else:
+            return TestConversation(self)
 
     @classmethod
     def generate_from_level(cls, level: int) -> "NPC":

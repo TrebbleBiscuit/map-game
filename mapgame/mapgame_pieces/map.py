@@ -57,7 +57,7 @@ class Tile:
         f_npc = NPC.generate_from_level(level + 2)
         f_npc.name = "human"
         f_npc.player_attitude = 1
-        f_npc.x, f_npc.y = 0, 0  # self.gen_random_coordinates()
+        f_npc.x, f_npc.y = self.gen_random_coordinates()
         self.npcs.append(f_npc)
 
     def _starting_rooms(self) -> RoomMap:

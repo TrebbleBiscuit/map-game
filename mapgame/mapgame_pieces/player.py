@@ -172,7 +172,6 @@ class Player(LivingThing):
         hp_txt = color_string(str(rec), "Fore.GREEN")
         self.gui.main_out.add_line(f"You recover {hp_txt} HP!")
         self.hp += rec
-        self.gui.main_out.add_line(f"You are now at {self.hp}/{self.max_hp} HP!")
 
     def heal_up_to(self, up_to: int):
         hp_missing = up_to - self.hp
