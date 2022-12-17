@@ -5,16 +5,22 @@ class Conversation:
     def __init__(self, player):
         self.player = player
         self.gui = player.gui
-        self.can_leave = False
+        self.can_leave = True
+        self.has_ended = False
 
     def exit_conversation(self):
         if not self.can_leave:
-            self.gui.main_out.add_line("You are not allowed to leave!")
+            self.gui.main_out.add_line("You can't leave this conversation yet!")
         else:
-            self.gui.main_out.add_line("Not sure how to exit a conversation yet")
+            self.has_ended = True
 
     def prompt(self):
         ...
+
+    def quote_to_out(self, quote: str):
+        """Wrap in quotes and print to main_out"""
+        quote = f'"{quote}"'
+        self.gui.main_out.add_line(quote)
 
     def respond(self):
         ...
@@ -27,50 +33,59 @@ class TestConversation(Conversation):
 
     def prompt(self):
         if self.stage == 0:
-            self.gui.main_out.add_line("Just say something!")
+            self.quote_to_out("Just say something!")
         elif self.stage == 1:
-            self.gui.main_out.add_line("Thanks for saying something!")
+            self.quote_to_out("Thanks for saying something!")
         else:
-            self.gui.main_out.add_line("Yeah we get it.")
+            self.quote_to_out("Yeah we get it.")
 
     def respond(self, to_say: str):
         if self.stage == 0:
             if to_say:
-                self.gui.main_out.add_line("You said it!")
+                self.quote_to_out("You said it!")
                 self.stage += 1
             else:
-                self.gui.main_out.add_line("Well, go on, say something!")
+                self.quote_to_out("Well, go on, say something!")
         elif self.stage == 1:
             resp = random.choice(
                 ["Uh-huh...", "I see...", "Wow...", "Cool...", "Neat..."]
             )
-            self.gui.main_out.add_line(resp)
-
-    def exit_conversation(self):
-        self.gui.main_out.add_line("Not sure how to exit a conversation yet")
+            self.quote_to_out(resp)
+        else:
+            self.quote_to_out("aight imma head out")
+            self.exit_conversation = True
 
 
 class RiddleConvo(Conversation):
     def __init__(self, player):
         super().__init__(player)
+        self.can_leave = False
         self.answered = False
         self.answered_correctly = False
+        self.riddle_text = "What has four paws and rhymes with 'rat'?"
         self.correct_answer = "cat"
 
     def prompt(self):
-        RIDDLE_TXT = "What has four paws and rhymes with 'rat'?"
         if not self.answered:
-            self.gui.main_out.add_line(RIDDLE_TXT)
+            self.quote_to_out(
+                f"Ho ho ho, traveler! I won't let you through until you answer my riddle! {self.riddle_text}"
+            )
         elif self.answered_correctly:
-            self.gui.main_out.add_line("Thanks for answering my riddle!")
+            self.quote_to_out("Thanks for answering my riddle!")
         else:
-            self.gui.main_out.add_line(f"Try my riddle again! {RIDDLE_TXT}")
+            self.quote_to_out(f"Try my riddle again! {self.riddle_text}")
 
     def respond(self, to_say: str):
         if not to_say:
             return
+        self.answered = True
         if to_say == self.correct_answer:
-            self.gui.main_out.add_line("You got my riddle right!")
+            self.quote_to_out("You got my riddle right!")
+            self.gui.main_out.add_line("They step aside to let you pass.")
             self.answered_correctly = True
+            self.can_leave = True
+            self.exit_conversation()
+        elif self.answered_correctly:
+            self.quote_to_out("No no, you had it before!")
         else:
-            self.gui.main_out.add_line("That's not the right answer!")
+            self.quote_to_out("That's not the right answer!")
