@@ -398,13 +398,19 @@ class Game:
                 if not x.is_dead and x.coordinates == self.player.coordinates
             ]
             if friendly_npcs:
-                this_npc = friendly_npcs[0]
-                self.gui.main_out.add_line(
-                    f"You strike up a conversation with the friendly {this_npc.name}."
-                )
-                self.enter_conversation(this_npc)
-                # return so that we don't check for combat and other conversations after this
-                return
+                for npc in friendly_npcs:
+                    if npc.conversation.is_over:
+                        self.gui.main_out.add_line(
+                            f"The {npc.name} doesn't have anything more to say."
+                        )
+                        return
+                    else:
+                        self.gui.main_out.add_line(
+                            f"You strike up a conversation with the friendly {this_npc.name}."
+                        )
+                        self.enter_conversation(this_npc)
+                        # return so that we don't check for combat and other conversations after this
+                        return
             else:
                 self.gui.main_out.add_line(INVALID_INPUT_MSG)
                 return

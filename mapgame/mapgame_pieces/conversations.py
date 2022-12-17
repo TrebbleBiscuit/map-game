@@ -70,13 +70,14 @@ class TestConversation(Conversation):
 
 
 class RiddleConvo(Conversation):
-    def __init__(self, npc):
+    def __init__(self, npc, riddle_text: str, correct_answers: set[str]):
         super().__init__(npc)
         self.can_leave = False
         self.answered = False
         self.answered_correctly = False
-        self.riddle_text = "What has four paws and rhymes with 'rat'?"
-        self.correct_answer = "cat"
+        self.riddle_text = riddle_text
+        self.correct_answers = correct_answers
+        self.guess_number = 0
 
     def prompt(self) -> str:
         if not self.answered:
@@ -91,22 +92,36 @@ class RiddleConvo(Conversation):
     def respond(self, player: "Player", to_say: str) -> str:
         if not to_say:
             return ""
-        self.answered = True
-        if to_say == self.correct_answer:
-            if not self.answered_correctly:
-                player.grant_xp(15)
-            self.answered_correctly = True
-            self.can_leave = True
-            self.exit_conversation()
-            return (
-                self.wrap_in_quotes("You got my riddle right!")
-                + "\n"
-                + f"The {self.npc.name} steps aside to let you pass."
-            )
         elif to_say in LEAVE_OPTIONS:
             self.exit_conversation()
             return self.wrap_in_quotes("Goodbye then!")
+        self.answered = True
+        self.guess_number += 1
+        if to_say in self.correct_answers:
+            if not self.answered_correctly:
+                xp_amount = max(16 - (2 * self.guess_number), 6)
+                player.grant_xp(xp_amount)
+            self.answered_correctly = True
+            self.can_leave = True
+            self.exit_conversation()
+            quote = f"You got my riddle right on the {self.number_suffix(self.guess_number)} guess!"
+            return (
+                self.wrap_in_quotes(quote)
+                + "\n"
+                + f"The {self.npc.name} steps aside to let you pass."
+            )
         elif self.answered_correctly:
             return self.wrap_in_quotes("No no, you had it before!")
         else:
             return self.wrap_in_quotes("That's not the right answer!")
+
+    @staticmethod
+    def number_suffix(num: int):
+        if num % 10 == 1 and num % 100 != 11:
+            return f"{num}st"
+        elif num % 10 == 2 and num % 100 != 12:
+            return f"{num}nd"
+        elif num % 10 == 3 and num % 100 != 13:
+            return f"{num}rd"
+        else:
+            return f"{num}th"

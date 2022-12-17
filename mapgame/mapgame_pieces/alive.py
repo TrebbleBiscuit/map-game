@@ -77,10 +77,15 @@ class NPC(LivingThing):
             return self._conversation
 
     def create_conversation(self) -> Conversation:
-        if random.random() < 0.5:
-            return RiddleConvo(self)
-        else:
-            return TestConversation(self)
+        match random.randint(1, 2):
+            case 1:
+                return TestConversation(self)
+            case 2:
+                return RiddleConvo(
+                    self,
+                    riddle_text="What has four paws and rhymes with 'rat'?",
+                    correct_answers=("cat", "rat"),
+                )
 
     @classmethod
     def generate_from_level(cls, level: int) -> "NPC":
