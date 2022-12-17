@@ -205,7 +205,7 @@ class Game:
 
     def open_chest(self):
         # here's the real stuff
-        self.current_tile.chests.remove((self.player.x, self.player.y))
+        self.current_tile.chests.remove(self.player.coordinates)
         item_in_chest, qty_in_chest = self.get_chest_contents()
         if item_in_chest == "money":
             self.gui.main_out.add_line(
@@ -244,7 +244,7 @@ class Game:
         for ct_npc in self.current_tile.npcs:
             if ct_npc.is_dead:
                 pass
-            elif (ct_npc.x, ct_npc.y) == (self.player.x, self.player.y):
+            elif (ct_npc.x, ct_npc.y) == self.player.coordinates:
                 if ct_npc.will_attack_player():
                     attacking_npcs.append(ct_npc)
                 else:
@@ -262,11 +262,21 @@ class Game:
         # self.stdscr.clrtobot()
         self.gui.update_stats()
         if self.game_state == GameState.in_map:
-            self.current_tile.room_flavor_text((self.player.x, self.player.y))
-            if (self.player.x, self.player.y) in self.current_tile.chests:
+            self.current_tile.room_flavor_text(self.player.coordinates)
+            if self.player.coordinates in self.current_tile.chests:
                 self.gui.main_out.add_line(
                     "There's a chest in this room! 'open' it to see what's inside."
                 )
+            for ct_npc in self.current_tile.npcs:
+                if not ct_npc.is_dead and ct_npc.coordinates == self.player.coordinates:
+                    if ct_npc.will_attack_player():
+                        self.gui.main_out.add_line(
+                            f"There is a hostile {ct_npc.name} in this room!"
+                        )
+                    else:
+                        self.gui.main_out.add_line(
+                            f"There is a friendly {ct_npc.name} in this room!"
+                        )
             self.gui.main_out.add_line("What direction do you want to move? [n/e/s/w]")
         elif self.game_state == GameState.in_combat:
             for hostile in self.in_combat_vs:
@@ -287,8 +297,8 @@ class Game:
 
     def get_current_room_name(self) -> str | None:
         """Return the name of the room the player is currently in"""
-        if (self.player.x, self.player.y) in self.current_tile.rooms:
-            return self.current_tile.rooms[(self.player.x, self.player.y)].name
+        if self.player.coordinates in self.current_tile.rooms:
+            return self.current_tile.rooms[self.player.coordinates].name
 
     def map_turn(self, command: str) -> bool | None:
         """Process a user's input command"""
@@ -300,11 +310,11 @@ class Game:
             player_move = self.player.move(self.current_tile, command)
             if player_move:  # move successful
                 self.gui.main_out.add_line(f"You move {player_move}.")
-                if (self.player.x, self.player.y) not in self.current_tile.explored:
+                if self.player.coordinates not in self.current_tile.explored:
                     # heal when entering new rooms
                     self.player._heal_over_time()
-                self.current_tile.explored.add((self.player.x, self.player.y))
-                # self.current_tile.room_flavor_text((self.player.x, self.player.y))
+                self.current_tile.explored.add(self.player.coordinates)
+                # self.current_tile.room_flavor_text(self.player.coordinates)
                 self._progress_time()
                 # TODO: print flavor text for room
             else:
@@ -324,7 +334,7 @@ class Game:
             "chest",
             "o",
         ]:
-            if (self.player.x, self.player.y) in self.current_tile.chests:
+            if self.player.coordinates in self.current_tile.chests:
                 self.open_chest()
             else:
                 self.gui.main_out.add_line("There's no chest here to open!")
@@ -339,7 +349,7 @@ class Game:
                 self.gui.main_out.add_line("You're already at full health!")
             else:
                 # can only use medbay once
-                self.current_tile.rooms.pop((self.player.x, self.player.y))
+                self.current_tile.rooms.pop(self.player.coordinates)
                 self.gui.main_out.add_line(
                     "You use the supplies in the medbay to restore some of your health!"
                 )
@@ -371,7 +381,7 @@ class Game:
                 return
             if self.current_tile._check_valid_coords(tc):
                 self.player.x, self.player.y = tc
-                self.current_tile.explored.add((self.player.x, self.player.y))
+                self.current_tile.explored.add(self.player.coordinates)
                 self.gui.main_out.add_line("poof~")
             else:
                 self.gui.main_out.add_line("off-map coordinates not allowed")

@@ -43,11 +43,22 @@ class Tile:
         )  # had to put the tuple in a list to get it to turn into a set of tuples
         self.paths = self.generate_paths(self.width * self.height)
         self.all_visible = False
+        self.add_hostile_npcs_to_tile(level)
+        self.add_friendly_npc_to_tile(level)
+
+    def add_hostile_npcs_to_tile(self, level: int):
         number_of_npcs = BASE_NPCS_PER_TILE + min(int(level / 6), 3)
         self.npcs = [NPC.generate_from_level(level) for x in range(number_of_npcs)]
         for npc in self.npcs:
             npc.x, npc.y = self.gen_random_coordinates()
             logger.debug(f"NPC spawned at {(npc.x, npc.y)}")
+
+    def add_friendly_npc_to_tile(self, level: int):
+        f_npc = NPC.generate_from_level(level + 2)
+        f_npc.name = "human"
+        f_npc.player_attitude = 1
+        f_npc.x, f_npc.y = 0, 0  # self.gen_random_coordinates()
+        self.npcs.append(f_npc)
 
     def _starting_rooms(self) -> RoomMap:
         rooms = {}

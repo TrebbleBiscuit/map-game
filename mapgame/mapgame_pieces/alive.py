@@ -21,6 +21,10 @@ class LivingThing:
         if self.hp < self.max_hp:
             self.hp += 1
 
+    @property
+    def coordinates(self) -> tuple[int, int]:
+        return (self.x, self.y)
+
     def move(self, tile: "Tile", direction: str) -> str | None:
         """Attempt to move a given direction
 
@@ -112,6 +116,7 @@ class NPC(LivingThing):
             logger.debug(f"{self.name} moved {mv_choice} to {(self.x, self.y)}")
 
     def take_damage(self, dmg: int) -> bool:
+        """deal `dmg` damage. return True if hostile is dead"""
         self.hp -= dmg
         if self.hp <= 0:
             self.is_dead = True

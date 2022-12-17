@@ -28,7 +28,7 @@ class Inventory:
         self._item_map: ItemMap = {  # this will be more useful when items are unique
             "Bullet": Item("Bullet"),
         }
-        self._equipped = {"melee": None, "ranged": None, "armor": None}
+        self._equipped: EquippedMap = {"melee": None, "ranged": None, "armor": None}
 
     @property
     def contents(self) -> InventoryContents:
