@@ -63,6 +63,10 @@ class GUIWrapper(App):
 
     def update_map(self):
         # escape markup so that `[n]` stays that way instead of disappearing
+
+        if self.game.game_state.value != 1:  # in_map
+            self.map_out.update(self.game.game_state.name.replace("_", " "))
+            return
         map_now = markup.escape(
             self.game.current_tile.get_map(self.game.player.x, self.game.player.y)
         )
