@@ -25,12 +25,13 @@ class Game:
     def __init__(self):
         self.gui = GUIWrapper(game=self)
         self.player = Player(self.gui)
-        self.map = Map(self.gui, MAP_WIDTH, MAP_HEIGHT, self.player.level)
-        self.current_tile = self.map.tiles[0]  # self.map.tiles[self.player.tile_index]
-        self.time: int = 0
+        self.map = Map(self.gui, MAP_WIDTH, MAP_HEIGHT)
+        self.current_tile = self.map.get_tile(
+            self.player.tile_index
+        )  # self.map.tiles[self.player.tile_index]
         # self.x = 0
         # self.y = 0
-        self.debug = True
+        self.debug = False
         self.game_state = GameState.in_map
         self.in_combat_vs: list[NPC] = []
         self.gui.run()
@@ -38,7 +39,7 @@ class Game:
     def _progress_time(self):
         if random.randint(1, 6) == 1:
             self.player._heal_over_time()
-        self.time += 1
+        self.player.time += 1
         for npc in self.current_tile.npcs:
             npc._on_time_pass(self.current_tile)
         # if random.randint(0, 9) == 0:
@@ -59,13 +60,14 @@ class Game:
             "Show 'em what you're made of",
             "Heroism is endurance for one moment more",
             "Only the dead have seen the end of war.",
-            "Aim towards the Enemy.",
+            "Aim towards the enemy.",
             "Try to look unimportant; they may be low on ammo.",
             "All warfare is based on deception.",
         ]
         if random.random() < 0.2:
             gui_choices.append("psssh...nothing personnel...kid...")
             gui_choices.append("What is this, some kind of map-game?")
+            gui_choices.append("You must construct additional pylons")
         self.gui.main_in.placeholder = random.choice(gui_choices)
         if self.in_combat_vs:
             raise RuntimeError(
@@ -99,8 +101,13 @@ class Game:
             act_dmg = random.randint(min_dmg, max_dmg)
             self.gui.main_out.add_line(f"You take a swing at the {enemy_text}!")
             dmg_txt = color_string(f"{act_dmg} damage", "Fore.RED")
-            self.gui.main_out.add_line(f"You do ({min_dmg}-{max_dmg}) {dmg_txt}!")
-            hostile.take_damage(act_dmg)
+            self.gui.main_out.add_line(f"You do [red]{dmg_txt}[/red]!")
+            if self.debug:
+                self.gui.main_out.add_line(f"DEBUG: ({min_dmg}-{max_dmg} dmg)")
+            if hostile.take_damage(act_dmg):
+                self.gui.main_out.add_line(
+                    f"It falls to the ground and disappears in a flash of light!"
+                )
 
     def shoot_attack_hostiles(self):
         """you know like with a gun"""
@@ -114,8 +121,13 @@ class Game:
         self.gui.main_out.add_line(f"You aim at the {enemy_text} and pull the trigger!")
         if hit:
             dmg_txt = color_string(f"{act_dmg} damage", "Fore.RED")
-            self.gui.main_out.add_line(f"You do ({min_dmg}-{max_dmg}) {dmg_txt}!")
-            hostile.take_damage(act_dmg)
+            self.gui.main_out.add_line(f"You do {dmg_txt}!")
+            if self.debug:
+                self.gui.main_out.add_line(f"DEBUG: ({min_dmg}-{max_dmg} dmg)")
+            if hostile.take_damage(act_dmg):
+                self.gui.main_out.add_line(
+                    f"It falls to the ground and disappears in a flash of light!"
+                )
         else:
             self.gui.main_out.add_line(f"You miss! ({self.player.gun_aiming}% to hit)")
 
@@ -168,15 +180,17 @@ class Game:
 
     def hostile_combat_turn(self, hostile: NPC):
         base_dmg = hostile.attack_power
-        min_dmg = int((base_dmg * 0.5) + 0.5)
-        max_dmg = int(base_dmg * 1.5)
+        min_dmg = int((base_dmg * 0.7) + 0.5)
+        max_dmg = int(base_dmg * 1.3)
         act_dmg = random.randint(min_dmg, max_dmg)
         enemy_text = color_string(f"{hostile.name}", "Fore.RED")
         self.gui.main_out.add_line(f"The {enemy_text} attacks you!")
-        dmg_txt = color_string(f"{act_dmg} damage", "Fore.RED")
-        self.gui.main_out.add_line(
-            f"It connects for ({min_dmg}-{max_dmg}) {dmg_txt}!",
-        )
+        # dmg_txt = color_string(f"{act_dmg} damage", "Fore.RED")
+        # self.gui.main_out.add_line(
+        #     f"It connects for ({min_dmg}-{max_dmg}) {dmg_txt}!",
+        # )
+        if self.debug:
+            self.gui.main_out.add_line(f"DEBUG: ({min_dmg}-{max_dmg}) enemy dmg")
         self.player.take_damage(act_dmg)
 
     def get_chest_contents(self) -> tuple[str, int]:
@@ -213,24 +227,16 @@ class Game:
     def portal_into_another_dimension(self, dim_num=None):
         # heal up to ~15% health
         self.player.heal_up_to(int(self.player.max_hp / 6))
-        self.player.save_to_file()
         if dim_num is None:
-            dim_num = self.player.tile_index + 1
+            self.player.tile_index += 1
+            dim_num = self.player.tile_index
         else:
-            pass
-        self.player.tile_index = dim_num
+            self.player.tile_index = dim_num
         self.gui.main_out.add_line(f"You portal into dimension #{dim_num}")
-        try:
-            self.current_tile = self.map.tiles[dim_num]
-            self.gui.main_out.add_line("This dimension already existed")
-        except IndexError:
-            self.player.grant_xp(dim_num * 2)
-            self.current_tile = self.map.get_tile(
-                dim_num, player_level=self.player.level
-            )
-
-        finally:
-            self.player.x, self.player.y = (0, 0)
+        self.player.grant_xp(dim_num * 2)
+        self.current_tile = self.map.get_tile(dim_num)
+        self.player.save_to_file()
+        self.player.x, self.player.y = (0, 0)
 
     def maybe_enter_combat(self):
         # Should we encounter an NPC?
@@ -268,7 +274,7 @@ class Game:
                 self.gui.main_out.add_line(
                     f"{enemy_text.title()}: {hostile.hp}/{hostile.max_hp} HP",
                 )
-            self.gui.main_out.add_line(f"You: {self.player.hp}/{self.player.max_hp} HP")
+            # self.gui.main_out.add_line(f"You: {self.player.hp}/{self.player.max_hp} HP")
             self.gui.main_out.add_line(
                 f"You can {color_string('melee', 'Fore.RED')} attack, or attempt to {color_string('run', 'Fore.CYAN')}.",
             )
@@ -342,20 +348,26 @@ class Game:
         # beyond here lies debug commands
         # elif self.debug and command[:2] == "ff":
         #     self.combat(ct_npc)
+        elif command[:5] == "debug":
+            self.debug = not self.debug
+            self.gui.main_out.add_line(f"Debug mode set to {self.debug}")
         elif self.debug and command[:2] == "xp":
             self.gui.main_out.add_line("DEBUG: Granting XP")
             self.player.grant_xp(int(command[2:].strip()))
         elif self.debug and command[:2] == "hp":
             self.gui.main_out.add_line("DEBUG: Setting HP")
             self.player.hp = int(command[2:].strip())
+        elif self.debug and command[:5] == "tpdim":
+            self.portal_into_another_dimension(dim_num=int(command[5:].strip()))
         elif self.debug and (command[:2] == "tp" or command[:4] == "tele"):
-            self.gui.main_out.add_line('teleport to what coordinates? (i.e. "1, 3")')
-            self.gui.main_out.add_line("remember y is inverted")
-            tc = command.split(" ")[1]
             try:
+                tc = command.split(" ")[1]
                 tc = tuple(int(cv.strip()) for cv in tc.split(","))
-            except:
-                self.gui.main_out.add_line("invalid coordinates!")
+            except (IndexError, ValueError) as err:
+                self.gui.main_out.add_line(
+                    'teleport to what coordinates? (i.e. "1, 3")'
+                )
+                self.gui.main_out.add_line("remember y is inverted")
                 return
             if self.current_tile._check_valid_coords(tc):
                 self.player.x, self.player.y = tc

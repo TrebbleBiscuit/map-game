@@ -82,6 +82,7 @@ class Player(LivingThing):
         self.level = 1
         self.xp = 0
         self.humanity = 100  # out of 100
+        self.time = 0
         if SAVE_PATH.exists():
             self.load_from_file()
 
@@ -98,6 +99,7 @@ class Player(LivingThing):
             "attack_power": self.attack_power,
             "money": self.money,
             "level": self.level,
+            "tile_index": self.tile_index,
             "xp": self.xp,
             "humanity": self.humanity,
             "inventory_contents": self.inventory.contents,
@@ -118,7 +120,7 @@ class Player(LivingThing):
     def grant_xp(self, xp: int):
         self.gui.main_out.add_line(f"You gained {xp} XP!")
         self.xp += xp
-        if self.xp > (20 * self.level):
+        if self.xp > (25 * pow(self.level, 1.3)):
             # lvl_txt = color_string(f"You have leveled up!", Fore.GREEN)
             lvl_txt = "[bold green]You have leveled up![/bold green]"
             self.gui.main_out.add_line(lvl_txt)
