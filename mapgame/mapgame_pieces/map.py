@@ -64,7 +64,6 @@ class Tile:
     def make_conversation(self):
 
         all_conversations = [
-            TestConversation(self),
             RiddleConvo(
                 self,
                 riddle_text="What has four paws and rhymes with 'rat'?",
@@ -81,12 +80,17 @@ class Tile:
         return random.choice(all_conversations)
 
     def add_friendly_npc_to_tile(self, level: int):
-        adjs = ["old", "young", "bald", "wandering"]
-        nouns = ["man", "woman", "person", "human", "adventurer"]
+        adj = random.choice(["old", "young", "bald", "spirited", "steadfast", "calm"])
+        noun = random.choice(["man", "woman", "person", "human", "wanderer"])
         f_npc = NPC.generate_from_level(level + 2)
-        f_npc.name = random.choice(adjs) + " " + random.choice(nouns)
         f_npc.player_attitude = 1
         f_npc.x, f_npc.y = self.gen_random_coordinates()
+        convo = self.make_conversation()
+        if isinstance(convo, WisdomConvo):
+            adj = "wise"
+        elif isinstance(convo, IntroConvo):
+            adj = "helpful"
+        f_npc.name = adj + " " + noun
         f_npc.conversation = self.make_conversation()
         self.npcs.append(f_npc)
 
