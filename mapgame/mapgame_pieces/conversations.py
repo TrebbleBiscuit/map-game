@@ -27,6 +27,61 @@ class Conversation:
         ...
 
 
+class NoConversation(Conversation):
+    def __init(self, npc):
+        super().__init__(npc)
+        self.has_ended = True
+
+
+class WisdomConvo(Conversation):
+    def __init__(self, npc, custom_wisdom: str = ""):
+        super().__init__(npc)
+        self.given_wisdom = 0
+        self.custom_wisdom = custom_wisdom
+
+    def prompt(self) -> str:
+        if self.given_wisdom == 0:
+            return self.wrap_in_quotes(
+                "Behold, adventurer! I am here to bestow upon you wisdom."
+            )
+        else:
+            return self.wrap_in_quotes("Be careful out there!")
+
+    def respond(self, player: "Player", to_say: str) -> str:
+        if to_say in LEAVE_OPTIONS or self.given_wisdom:
+            self.exit_conversation()
+            return self.wrap_in_quotes("Good luck on your journey.")
+        self.given_wisdom += 1
+
+        if self.custom_wisdom:
+            return self.wrap_in_quotes(self.custom_wisdom)
+
+        possible_wisdom = ["xp"]
+        if player.humanity < 85:
+            possible_wisdom.append("humanity")
+        if not player.abilities.passive_heal_double:
+            possible_wisdom.append("passive_heal_double")
+        if not player.abilities.reduced_humanity_loss:
+            possible_wisdom.append("reduced_humanity_loss")
+
+        out_msg = f"The {self.npc.name}'s wisdom "
+        match self.this_wisdom:
+            case "xp":
+                player.grant_xp(player.level * 4 + 10)
+                return out_msg + "gives you a sense of experience!"
+            case "humanity":
+                player.humanity += 15
+                return out_msg + "makes you feel more clearheaded!"
+            case "passive_heal_double":
+                player.grant_ability("passive_heal_double")
+                return out_msg + "teaches you to passively heal twice as fast!! Wow!"
+            case "reduced_humanity_loss":
+                player.grant_ability("reduced_humanity_loss")
+                return out_msg + "teaches you to reduce your humanity losses!! Wow!"
+            case _ as another:
+                return f"{another} shouldnt be here rip"
+
+
 class IntroConvo(Conversation):
     def __init__(self, npc):
         super().__init__(npc)

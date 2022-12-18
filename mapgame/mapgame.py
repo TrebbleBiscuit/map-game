@@ -9,7 +9,6 @@ from mapgame_pieces.map import Map
 from mapgame_pieces.utils import color_string, sanitize_input, get_plural_suffix
 from mapgame_pieces.gui import GUIWrapper
 from mapgame_pieces.items import Item
-from mapgame_pieces.conversations import Conversation, RiddleConvo
 
 logger = logging.getLogger(__name__)
 
@@ -61,11 +60,19 @@ class Game:
 
     def enter_conversation(self, npc: NPC):
         # self.gui.map_out.update("")
+        gui_choices = [
+            "Type a response and press enter",
+            "Say something interesting!",
+            "One good conversation can shift the direction of change forever",
+            "The best of life is conversation",
+        ]
+        if random.random() < 0.2:
+            gui_choices.append("70 to 93 percent of all communication is nonverbal")
+        self.gui.main_in.placeholder = random.choice(gui_choices)
         if self.interaction.in_conversation_with:
             raise RuntimeError(
                 f"Attempted to enter conversation, but player is already speaking with: {self.interaction.in_conversation_with}"
             )
-
         self.game_state = GameState.in_conversation
         self.interaction.in_conversation_with = npc
 
@@ -405,9 +412,9 @@ class Game:
                         return
                     else:
                         self.gui.main_out.add_line(
-                            f"You strike up a conversation with the friendly {this_npc.name}."
+                            f"You strike up a conversation with the friendly {npc.name}."
                         )
-                        self.enter_conversation(this_npc)
+                        self.enter_conversation(npc)
                         # return so that we don't check for combat and other conversations after this
                         return
             else:
@@ -426,7 +433,9 @@ class Game:
             self.gui.main_out.add_line("DEBUG: Setting HP")
             self.player.hp = int(command[2:].strip())
         elif self.debug and command[:5] == "tpdim":
-            self.portal_into_another_dimension(dim_num=int(command[5:].strip()))
+            self.portal_into_another_dimension(
+                dim_num=int(command[5:].strip() or self.player.tile_index + 1)
+            )
         elif self.debug and (command[:2] == "tp" or command[:4] == "tele"):
             try:
                 tc = command.split(" ")[1]

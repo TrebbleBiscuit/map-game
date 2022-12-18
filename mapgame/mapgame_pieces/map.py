@@ -3,6 +3,14 @@ from mapgame_pieces.alive import NPC
 import math
 import random
 from dataclasses import dataclass
+from mapgame_pieces.conversations import (
+    Conversation,
+    TestConversation,
+    RiddleConvo,
+    IntroConvo,
+    WisdomConvo,
+    NoConversation,
+)
 
 logger = logging.getLogger(__name__)
 BASE_NPCS_PER_TILE = 7
@@ -53,6 +61,25 @@ class Tile:
             npc.x, npc.y = self.gen_random_coordinates()
             logger.debug(f"NPC spawned at {(npc.x, npc.y)}")
 
+    def make_conversation(self):
+
+        all_conversations = [
+            TestConversation(self),
+            RiddleConvo(
+                self,
+                riddle_text="What has four paws and rhymes with 'rat'?",
+                correct_answers=("cat", "rat"),
+            ),
+            IntroConvo(self),
+            WisdomConvo(self),
+            WisdomConvo(
+                self,
+                f"There are {len(self.chests)} unopened chests and {len(self.npcs) + 1} living creatures on this floor.",
+            ),
+        ]
+
+        return random.choice(all_conversations)
+
     def add_friendly_npc_to_tile(self, level: int):
         adjs = ["old", "young", "bald", "wandering"]
         nouns = ["man", "woman", "person", "human", "adventurer"]
@@ -60,6 +87,7 @@ class Tile:
         f_npc.name = random.choice(adjs) + " " + random.choice(nouns)
         f_npc.player_attitude = 1
         f_npc.x, f_npc.y = self.gen_random_coordinates()
+        f_npc.conversation = self.make_conversation()
         self.npcs.append(f_npc)
 
     def _starting_rooms(self) -> RoomMap:

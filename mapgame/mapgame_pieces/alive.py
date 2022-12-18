@@ -1,11 +1,6 @@
 import random
 import logging
-from mapgame_pieces.conversations import (
-    Conversation,
-    TestConversation,
-    RiddleConvo,
-    IntroConvo,
-)
+from mapgame_pieces.conversations import Conversation, NoConversation
 
 logger = logging.getLogger(__name__)
 
@@ -72,26 +67,7 @@ class NPC(LivingThing):
         self.xp_reward = 0
         self.wander = True
         self.is_dead = False
-
-    @property
-    def conversation(self) -> Conversation | None:
-        try:
-            return self._conversation
-        except AttributeError:
-            self._conversation = self.create_conversation()
-            return self._conversation
-
-    def create_conversation(self) -> Conversation:
-        all_conversations = [
-            TestConversation(self),
-            RiddleConvo(
-                self,
-                riddle_text="What has four paws and rhymes with 'rat'?",
-                correct_answers=("cat", "rat"),
-            ),
-            IntroConvo(self),
-        ]
-        return random.choice(all_conversations)
+        self.conversation: Conversation | None = None
 
     @classmethod
     def generate_from_level(cls, level: int) -> "NPC":
