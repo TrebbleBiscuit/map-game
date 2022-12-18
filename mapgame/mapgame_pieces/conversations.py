@@ -27,6 +27,47 @@ class Conversation:
         ...
 
 
+class IntroConvo(Conversation):
+    def __init__(self, npc):
+        super().__init__(npc)
+        self.stage = 0
+
+    def prompt(self) -> str:
+        if self.stage == 0:
+            return self.wrap_in_quotes(
+                "Hey, you! Glad to see a friendly face around here."
+            )
+        elif self.stage == 1:
+            return self.wrap_in_quotes(
+                "I woke up here one day - I'm trying to escape and get back home."
+            )
+        elif self.stage == 2:
+            return self.wrap_in_quotes(
+                "The only way out is through a portal to the east, but it only seems to lead deeper..."
+            )
+        elif self.stage == 3:
+            return self.wrap_in_quotes(
+                "Let me know if you find another way out, will you?"
+            )
+        elif self.stage == 4:
+            return self.wrap_in_quotes(
+                "Oh, just so you know, you can type `leave` or `exit` to end most conversations."
+            )
+        elif self.stage == 5:
+            return self.wrap_in_quotes("Anyway, take care!")
+
+    def respond(self, player: "Player", to_say: str) -> str:
+        if to_say in LEAVE_OPTIONS:
+            if self.exit_conversation():
+                return self.wrap_in_quotes("Be safe out there.")
+        if self.stage < 5:
+            self.stage += 1
+        else:
+            self.exit_conversation()
+            return self.wrap_in_quotes("Be safe out there.")
+        return ""
+
+
 class TestConversation(Conversation):
     def __init__(self, npc):
         super().__init__(npc)

@@ -275,11 +275,6 @@ class Game:
         if attacking_npcs:
             self.enter_combat(attacking_npcs)
         elif other_npcs:
-            for ct_npc in other_npcs:
-                # for when there are multiple npcs
-                self.gui.main_out.add_line(
-                    f"There is a friendly {ct_npc.name} in this room!"
-                )
             conversation_npcs = [x for x in other_npcs if not x.conversation.has_ended]
             if conversation_npcs:
                 convo_npc = random.choice(conversation_npcs)
@@ -399,7 +394,7 @@ class Game:
             ]
             if friendly_npcs:
                 for npc in friendly_npcs:
-                    if npc.conversation.is_over:
+                    if npc.conversation.has_ended:
                         self.gui.main_out.add_line(
                             f"The {npc.name} doesn't have anything more to say."
                         )

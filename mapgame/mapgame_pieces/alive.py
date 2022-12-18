@@ -1,6 +1,11 @@
 import random
 import logging
-from mapgame_pieces.conversations import Conversation, TestConversation, RiddleConvo
+from mapgame_pieces.conversations import (
+    Conversation,
+    TestConversation,
+    RiddleConvo,
+    IntroConvo,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -77,21 +82,24 @@ class NPC(LivingThing):
             return self._conversation
 
     def create_conversation(self) -> Conversation:
-        match random.randint(1, 2):
-            case 1:
-                return TestConversation(self)
-            case 2:
-                return RiddleConvo(
-                    self,
-                    riddle_text="What has four paws and rhymes with 'rat'?",
-                    correct_answers=("cat", "rat"),
-                )
+        all_conversations = [
+            TestConversation(self),
+            RiddleConvo(
+                self,
+                riddle_text="What has four paws and rhymes with 'rat'?",
+                correct_answers=("cat", "rat"),
+            ),
+            IntroConvo(self),
+        ]
+        return random.choice(all_conversations)
 
     @classmethod
     def generate_from_level(cls, level: int) -> "NPC":
         if random.random() < 0.2:
             level += 1
-        name = random.choice(["slime", "skeleton", "bad guy", "zombie", "mugger"])
+        adjs = ["spooky", "scary", "threatening", "menacing", "dangerous"]
+        nouns = ["slime", "skeleton", "bad guy", "zombie", "mugger"]
+        name = random.choice(adjs) + " " + random.choice(nouns)
         logger.info(f"Generating level {level} enemy {name}")
         inst = cls(name)
         hp_base = random.randint(15, 20)
