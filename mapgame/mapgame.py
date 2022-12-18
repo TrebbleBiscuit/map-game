@@ -257,7 +257,9 @@ class Game:
         else:
             self.player.tile_index = dim_num
         self.gui.main_out.add_line(f"You portal into dimension #{dim_num}")
-        self.player.grant_xp(dim_num * 2)
+        if self.player.humanity > 5:
+            self.player.humanity -= 1
+        self.player.grant_xp(dim_num * 3 + random.randint(4, 10))
         self.current_tile = self.map.get_tile(dim_num)
         self.player.save_to_file()
         self.player.x, self.player.y = (0, 0)
