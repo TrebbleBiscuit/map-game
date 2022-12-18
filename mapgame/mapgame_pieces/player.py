@@ -81,10 +81,20 @@ class Player(LivingThing):
         self.money = 0
         self.level = 1
         self.xp = 0
-        self.humanity = 100  # out of 100
+        self._humanity = 100  # out of 100
         self.time = 0
         if SAVE_PATH.exists():
             self.load_from_file()
+
+    @property
+    def humanity(self) -> int:
+        return self._humanity
+
+    @humanity.setter
+    def humanity(self, val: int):
+        if val > 100:
+            val = 100
+        self._humanity = val
 
     @property
     def gun_aiming(self) -> int:

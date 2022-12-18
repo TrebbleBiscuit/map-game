@@ -130,6 +130,7 @@ class Game:
                 self.gui.main_out.add_line(
                     f"It falls to the ground and disappears in a flash of light!"
                 )
+                self.player.humanity += 1
 
     def shoot_attack_hostiles(self):
         """you know like with a gun"""
@@ -150,6 +151,7 @@ class Game:
                 self.gui.main_out.add_line(
                     f"It falls to the ground and disappears in a flash of light!"
                 )
+                self.player.humanity += 1
         else:
             self.gui.main_out.add_line(f"You miss! ({self.player.gun_aiming}% to hit)")
 
