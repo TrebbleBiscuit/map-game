@@ -86,6 +86,22 @@ class Abilities:
             setattr(self, key, val)
 
 
+@dataclass
+class Flags:
+    def __init__(self, saved: dict | None = None):
+        self.medium_humanity_warning = False
+
+        if saved:
+            self.from_saved(saved)
+
+    def to_save(self):
+        return {key: val for key, val in self.__dict__.items() if val}
+
+    def from_saved(self, saved):
+        for key, val in saved.items():
+            setattr(self, key, val)
+
+
 class Player(LivingThing):
     def __init__(self, gui: "GUIWrapper"):
         super().__init__()
@@ -95,6 +111,7 @@ class Player(LivingThing):
         self.attack_power = 4  # base melee damage
         self.inventory = Inventory()
         self.abilities = Abilities()
+        self.flags = Flags()
         self.money = 0
         self.level = 1
         self.xp = 0
@@ -117,6 +134,11 @@ class Player(LivingThing):
             val += 1
             if diff < -9:
                 val += 1
+        
+        if val < 80 and not self.flags.medium_humanity_warning:
+            self.flags.medium_humanity_warning = True
+            warn_msg = "As you lose a part of your humanity, you hear dark whispers at the edge of your focus..."
+            self.gui.main_out.add_line(warn_msg)
 
         self._humanity = val
 
@@ -138,6 +160,7 @@ class Player(LivingThing):
             "humanity": self.humanity,
             "inventory_contents": self.inventory.contents,
             "abilities": self.abilities.to_save(),
+            "flags": self.flags.to_save(),
         }
         with open(SAVE_PATH, "w") as savefile:
             json.dump(save_data, savefile)
@@ -151,6 +174,8 @@ class Player(LivingThing):
                 self.inventory = Inventory(contents=value)
             elif entry == "abilities":
                 self.abilities = Abilities(saved=value)
+            elif entry == "flags":
+                self.flags = Flags(saved=value)
             else:
                 setattr(self, entry, value)
 

@@ -21,6 +21,7 @@ class GameState(Enum):
     in_map = 1
     in_combat = 2
     in_conversation = 3
+    in_limbo = 4
 
 
 @dataclass
@@ -48,15 +49,24 @@ class Game:
         self.player.time += 1
         for npc in self.current_tile.npcs:
             npc._on_time_pass(self.current_tile)
-        # if random.randint(0, 9) == 0:
-        #     self.gui.main_out.add_line("Random enemy encounter!!!!")
-        #     enemy = NPC.generate_from_level(self.player.tile_index)
-        #     self.gui.main_out.add_line(vars(enemy))
-        #     self.combat(enemy)
-        #     # uinput = ''
-        #     # while uinput.lower() != 'ok':
-        #     #     the input abve won't work with curses, fix that when you uncomment
-        #     #     uinput = input(self.wm.stdscr, "you gotta type ok to continue!")
+
+    def enter_limbo(self):
+        gui_choices = [
+            "In a moment you will have an experience that will seem completely real",
+            "You are in limbo",
+            "A single moment stretched out to infinity",
+            "You are everywhere and nowhere, a place between worlds",
+            "Is there anybody out there?",
+        ]
+        if random.random() < 0.2:
+            gui_choices.append("I N T E R D I M E N S I O N A L   L I M B O")
+        self.gui.main_out.add_line("You feel yourself enter interdimensional limbo!")
+        self.gui.main_in.placeholder = random.choice(gui_choices)
+        self.game_state = GameState.in_limbo
+
+    def exit_limbo(self):
+        self.gui.main_in.placeholder = self.gui.default_input_placeholder
+        self.game_state = GameState.in_map
 
     def enter_conversation(self, npc: NPC):
         # self.gui.map_out.update("")
@@ -272,6 +282,8 @@ class Game:
         self.current_tile = self.map.get_tile(dim_num)
         self.player.save_to_file()
         self.player.x, self.player.y = (0, 0)
+        if not self.player.tile_index % 5:
+            self.enter_limbo()
 
     def maybe_enter_combat(self):
         # Should we encounter an NPC?
@@ -333,8 +345,28 @@ class Game:
             assert self.interaction.in_conversation_with
             out = self.interaction.in_conversation_with.conversation.prompt()
             self.gui.main_out.add_line(out)
+        elif self.game_state == GameState.in_limbo:
+            if self.player.humanity < 80 and self.player.money >= 10:
+                self.gui.main_out.add_line(
+                    "You can pay tithe to regain humanity (2c/h)"
+                )
+            if self.player.humanity < 80 and self.player.humanity > 20:
+                self.gui.main_out.add_line("You could pray to the dark gods")
+            self.gui.main_out.add_line("You can continue onward to exit limbo")
         else:
             raise ValueError(f"Invalid Game State '{self.game_state}'")
+
+    def limbo_turn(self, command: str):
+        if command in ["continue", "c", "down", "go", "leave", "exit"]:
+            self.exit_limbo()
+        elif command in ["pay", "tithe"] and self.player.humanity < 80 and self.player.money >= 10:
+            pay = min(4, player.money // 10) * 10
+            regain = pay // 2
+            self.gui.main_out.add_line(
+                "You exchange {pay} money for {regain} humanity!"
+            )
+            self.player.money -= pay
+            self.player.humanity += regain
 
     def get_current_room_name(self) -> str | None:
         """Return the name of the room the player is currently in"""
@@ -480,6 +512,8 @@ class Game:
                 self.gui.main_out.add_line(out)
                 if convo.has_ended:
                     self.end_conversation()
+            case GameState.in_limbo:
+                return self.limbo_turn(command)
             case _:
                 raise ValueError(f"Invalid Game State '{self.game_state}'")
 
