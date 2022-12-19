@@ -1,5 +1,6 @@
 import random
 import logging
+from mapgame_pieces.conversations import Conversation, NoConversation
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +21,10 @@ class LivingThing:
     def _heal_over_time(self):
         if self.hp < self.max_hp:
             self.hp += 1
+
+    @property
+    def coordinates(self) -> tuple[int, int]:
+        return (self.x, self.y)
 
     def move(self, tile: "Tile", direction: str) -> str | None:
         """Attempt to move a given direction
@@ -62,12 +67,15 @@ class NPC(LivingThing):
         self.xp_reward = 0
         self.wander = True
         self.is_dead = False
+        self.conversation: Conversation | None = None
 
     @classmethod
     def generate_from_level(cls, level: int) -> "NPC":
         if random.random() < 0.2:
             level += 1
-        name = random.choice(["slime", "skeleton", "bad guy", "zombie", "mugger"])
+        adjs = ["spooky", "scary", "threatening", "menacing", "dangerous"]
+        nouns = ["slime", "skeleton", "bad guy", "zombie", "mugger"]
+        name = random.choice(adjs) + " " + random.choice(nouns)
         logger.info(f"Generating level {level} enemy {name}")
         inst = cls(name)
         hp_base = random.randint(15, 20)
@@ -112,6 +120,7 @@ class NPC(LivingThing):
             logger.debug(f"{self.name} moved {mv_choice} to {(self.x, self.y)}")
 
     def take_damage(self, dmg: int) -> bool:
+        """deal `dmg` damage. return True if hostile is dead"""
         self.hp -= dmg
         if self.hp <= 0:
             self.is_dead = True

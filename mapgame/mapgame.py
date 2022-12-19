@@ -1,11 +1,12 @@
 import logging
 import random
-from rich.logging import RichHandler
+from enum import Enum
+from dataclasses import dataclass, field
+
 from mapgame_pieces.player import Player
 from mapgame_pieces.alive import NPC
 from mapgame_pieces.map import Map
 from mapgame_pieces.utils import color_string, sanitize_input, get_plural_suffix
-from enum import Enum
 from mapgame_pieces.gui import GUIWrapper
 from mapgame_pieces.items import Item
 
@@ -19,6 +20,13 @@ MAP_HEIGHT = 4
 class GameState(Enum):
     in_map = 1
     in_combat = 2
+    in_conversation = 3
+
+
+@dataclass
+class CurrentInteraction:
+    in_combat_vs: list[NPC] = field(default_factory=list)
+    in_conversation_with: NPC | None = None
 
 
 class Game:
@@ -29,11 +37,9 @@ class Game:
         self.current_tile = self.map.get_tile(
             self.player.tile_index
         )  # self.map.tiles[self.player.tile_index]
-        # self.x = 0
-        # self.y = 0
         self.debug = False
         self.game_state = GameState.in_map
-        self.in_combat_vs: list[NPC] = []
+        self.interaction = CurrentInteraction()
         self.gui.run()
 
     def _progress_time(self):
@@ -52,6 +58,30 @@ class Game:
         #     #     the input abve won't work with curses, fix that when you uncomment
         #     #     uinput = input(self.wm.stdscr, "you gotta type ok to continue!")
 
+    def enter_conversation(self, npc: NPC):
+        # self.gui.map_out.update("")
+        gui_choices = [
+            "Type a response and press enter",
+            "Say something interesting!",
+            "One good conversation can shift the direction of change forever",
+            "The best of life is conversation",
+        ]
+        if random.random() < 0.2:
+            gui_choices.append("70 to 93 percent of all communication is nonverbal")
+        self.gui.main_in.placeholder = random.choice(gui_choices)
+        if self.interaction.in_conversation_with:
+            raise RuntimeError(
+                f"Attempted to enter conversation, but player is already speaking with: {self.interaction.in_conversation_with}"
+            )
+        self.game_state = GameState.in_conversation
+        self.interaction.in_conversation_with = npc
+
+    def end_conversation(self):
+        self.gui.main_in.placeholder = self.gui.default_input_placeholder
+        self.gui.main_out.add_line("Time to continue exploring.")
+        self.game_state = GameState.in_map
+        self.interaction.in_conversation_with = None
+
     def enter_combat(self, hostiles: list[NPC]):
         # update GUI
         gui_choices = [
@@ -69,12 +99,11 @@ class Game:
             gui_choices.append("What is this, some kind of map-game?")
             gui_choices.append("You must construct additional pylons")
         self.gui.main_in.placeholder = random.choice(gui_choices)
-        if self.in_combat_vs:
+        if self.interaction.in_combat_vs:
             raise RuntimeError(
-                f"Attempted to enter combat, but player is already fighting: {self.in_combat_vs}"
+                f"Attempted to enter combat, but player is already fighting: {self.interaction.in_combat_vs}"
             )
-        # only support 1v1 combat rn but eventually want multiple hostiles
-        self.in_combat_vs = hostiles
+        self.interaction.in_combat_vs = hostiles
         self.game_state = GameState.in_combat
         if len(hostiles) == 1:
             enemy_text = color_string(f"{hostiles[0].name}", "Fore.RED")
@@ -88,7 +117,7 @@ class Game:
         self.gui.main_out.add_line(
             "With combat behind you for now, it's time to keep exploring."
         )
-        self.in_combat_vs = []
+        self.interaction.in_combat_vs = []
         self.game_state = GameState.in_map
 
     def melee_attack_hostiles(self):
@@ -96,7 +125,7 @@ class Game:
         base_dmg = self.player.attack_power
         min_dmg = int((base_dmg * 0.5) + 0.5)
         max_dmg = int(base_dmg * 1.5)
-        for hostile in self.in_combat_vs:
+        for hostile in self.interaction.in_combat_vs:
             enemy_text = color_string(f"{hostile.name}", "Fore.RED")
             act_dmg = random.randint(min_dmg, max_dmg)
             self.gui.main_out.add_line(f"You take a swing at the {enemy_text}!")
@@ -108,6 +137,7 @@ class Game:
                 self.gui.main_out.add_line(
                     f"It falls to the ground and disappears in a flash of light!"
                 )
+                self.player.humanity += 1
 
     def shoot_attack_hostiles(self):
         """you know like with a gun"""
@@ -116,7 +146,7 @@ class Game:
         max_dmg = int(base_dmg * 1.5)
         act_dmg = random.randint(min_dmg, max_dmg)
         hit = random.randint(0, 100) <= self.player.gun_aiming
-        hostile = random.choice(self.in_combat_vs)
+        hostile = random.choice(self.interaction.in_combat_vs)
         enemy_text = color_string(f"{hostile.name}", "Fore.RED")
         self.gui.main_out.add_line(f"You aim at the {enemy_text} and pull the trigger!")
         if hit:
@@ -128,11 +158,12 @@ class Game:
                 self.gui.main_out.add_line(
                     f"It falls to the ground and disappears in a flash of light!"
                 )
+                self.player.humanity += 1
         else:
             self.gui.main_out.add_line(f"You miss! ({self.player.gun_aiming}% to hit)")
 
     def combat(self, ui: str):
-        assert len(self.in_combat_vs) > 0
+        assert len(self.interaction.in_combat_vs) > 0
         if ui in ["melee", "m"]:
             self.melee_attack_hostiles()
         elif ui in ["shoot", "s"]:
@@ -160,7 +191,7 @@ class Game:
             return
         # if any hostiles are dead, give xp and update list of hostiles
         out_of_combat = []
-        for hostile in self.in_combat_vs:
+        for hostile in self.interaction.in_combat_vs:
             if hostile.is_dead:
                 out_of_combat.append(hostile)
                 self.player.grant_xp(hostile.xp_reward)
@@ -169,12 +200,14 @@ class Game:
                 out_of_combat.append(hostile)
                 logger.info(f"{hostile.name} exits combat because attitude is high")
         if out_of_combat:
-            self.in_combat_vs = [x for x in self.in_combat_vs if x not in out_of_combat]
-        if not self.in_combat_vs:
+            self.interaction.in_combat_vs = [
+                x for x in self.interaction.in_combat_vs if x not in out_of_combat
+            ]
+        if not self.interaction.in_combat_vs:
             logger.info("Ending combat because all enemies are dead")
             self.end_combat()
             return
-        for hostile in self.in_combat_vs:
+        for hostile in self.interaction.in_combat_vs:
             self.hostile_combat_turn(hostile)
         self.gui.main_out.add_line("")
 
@@ -205,7 +238,7 @@ class Game:
 
     def open_chest(self):
         # here's the real stuff
-        self.current_tile.chests.remove((self.player.x, self.player.y))
+        self.current_tile.chests.remove(self.player.coordinates)
         item_in_chest, qty_in_chest = self.get_chest_contents()
         if item_in_chest == "money":
             self.gui.main_out.add_line(
@@ -233,7 +266,9 @@ class Game:
         else:
             self.player.tile_index = dim_num
         self.gui.main_out.add_line(f"You portal into dimension #{dim_num}")
-        self.player.grant_xp(dim_num * 2)
+        if self.player.humanity > 5:
+            self.player.humanity -= 1
+        self.player.grant_xp(dim_num * 3 + random.randint(4, 10))
         self.current_tile = self.map.get_tile(dim_num)
         self.player.save_to_file()
         self.player.x, self.player.y = (0, 0)
@@ -241,35 +276,47 @@ class Game:
     def maybe_enter_combat(self):
         # Should we encounter an NPC?
         attacking_npcs = []
+        other_npcs = []
         for ct_npc in self.current_tile.npcs:
-            if ct_npc.is_dead:
-                pass
-            elif (ct_npc.x, ct_npc.y) == (self.player.x, self.player.y):
+            if not ct_npc.is_dead and ct_npc.coordinates == self.player.coordinates:
                 if ct_npc.will_attack_player():
                     attacking_npcs.append(ct_npc)
                 else:
-                    self.gui.main_out.add_line(
-                        f"There is a friendly {ct_npc.name} in this room!"
-                    )
-                    self.gui.main_out.add_line(
-                        "Non-hostile NPC encounters not yet implemented."
-                    )
+                    other_npcs.append(ct_npc)
         if attacking_npcs:
             self.enter_combat(attacking_npcs)
+        elif other_npcs:
+            conversation_npcs = [x for x in other_npcs if not x.conversation.has_ended]
+            if conversation_npcs:
+                convo_npc = random.choice(conversation_npcs)
+                self.gui.main_out.add_line(
+                    f"The friendly {convo_npc.name} in this room strikes up a conversation with you!"
+                )
+                self.enter_conversation(convo_npc)
 
     def turn_prompt(self):
         """Prompt the user to enter a command"""
         # self.stdscr.clrtobot()
         self.gui.update_stats()
         if self.game_state == GameState.in_map:
-            self.current_tile.room_flavor_text((self.player.x, self.player.y))
-            if (self.player.x, self.player.y) in self.current_tile.chests:
+            self.current_tile.room_flavor_text(self.player.coordinates)
+            if self.player.coordinates in self.current_tile.chests:
                 self.gui.main_out.add_line(
                     "There's a chest in this room! 'open' it to see what's inside."
                 )
+            for ct_npc in self.current_tile.npcs:
+                if not ct_npc.is_dead and ct_npc.coordinates == self.player.coordinates:
+                    if ct_npc.will_attack_player():
+                        self.gui.main_out.add_line(
+                            f"There is a hostile {ct_npc.name} in this room!"
+                        )
+                    else:
+                        self.gui.main_out.add_line(
+                            f"There is a friendly {ct_npc.name} in this room!"
+                        )
             self.gui.main_out.add_line("What direction do you want to move? [n/e/s/w]")
         elif self.game_state == GameState.in_combat:
-            for hostile in self.in_combat_vs:
+            for hostile in self.interaction.in_combat_vs:
                 enemy_text = color_string(f"{hostile.name}", "Fore.RED")
                 self.gui.main_out.add_line(
                     f"{enemy_text.title()}: {hostile.hp}/{hostile.max_hp} HP",
@@ -282,13 +329,17 @@ class Game:
                 self.gui.main_out.add_line(
                     f"You can also try to shoot an enemy ({self.player.gun_aiming}%)"
                 )
+        elif self.game_state == GameState.in_conversation:
+            assert self.interaction.in_conversation_with
+            out = self.interaction.in_conversation_with.conversation.prompt()
+            self.gui.main_out.add_line(out)
         else:
             raise ValueError(f"Invalid Game State '{self.game_state}'")
 
     def get_current_room_name(self) -> str | None:
         """Return the name of the room the player is currently in"""
-        if (self.player.x, self.player.y) in self.current_tile.rooms:
-            return self.current_tile.rooms[(self.player.x, self.player.y)].name
+        if self.player.coordinates in self.current_tile.rooms:
+            return self.current_tile.rooms[self.player.coordinates].name
 
     def map_turn(self, command: str) -> bool | None:
         """Process a user's input command"""
@@ -300,11 +351,11 @@ class Game:
             player_move = self.player.move(self.current_tile, command)
             if player_move:  # move successful
                 self.gui.main_out.add_line(f"You move {player_move}.")
-                if (self.player.x, self.player.y) not in self.current_tile.explored:
+                if self.player.coordinates not in self.current_tile.explored:
                     # heal when entering new rooms
                     self.player._heal_over_time()
-                self.current_tile.explored.add((self.player.x, self.player.y))
-                # self.current_tile.room_flavor_text((self.player.x, self.player.y))
+                self.current_tile.explored.add(self.player.coordinates)
+                # self.current_tile.room_flavor_text(self.player.coordinates)
                 self._progress_time()
                 # TODO: print flavor text for room
             else:
@@ -324,7 +375,7 @@ class Game:
             "chest",
             "o",
         ]:
-            if (self.player.x, self.player.y) in self.current_tile.chests:
+            if self.player.coordinates in self.current_tile.chests:
                 self.open_chest()
             else:
                 self.gui.main_out.add_line("There's no chest here to open!")
@@ -339,12 +390,36 @@ class Game:
                 self.gui.main_out.add_line("You're already at full health!")
             else:
                 # can only use medbay once
-                self.current_tile.rooms.pop((self.player.x, self.player.y))
+                self.current_tile.rooms.pop(self.player.coordinates)
                 self.gui.main_out.add_line(
                     "You use the supplies in the medbay to restore some of your health!"
                 )
                 self.player.recover_hp(int(self.player.max_hp * 0.75))
                 self._progress_time()
+
+        elif command in ["talk", "conversation", "speak"]:
+            friendly_npcs = [
+                x
+                for x in self.current_tile.npcs
+                if not x.is_dead and x.coordinates == self.player.coordinates
+            ]
+            if friendly_npcs:
+                for npc in friendly_npcs:
+                    if npc.conversation.has_ended:
+                        self.gui.main_out.add_line(
+                            f"The {npc.name} doesn't have anything more to say."
+                        )
+                        return
+                    else:
+                        self.gui.main_out.add_line(
+                            f"You strike up a conversation with the friendly {npc.name}."
+                        )
+                        self.enter_conversation(npc)
+                        # return so that we don't check for combat and other conversations after this
+                        return
+            else:
+                self.gui.main_out.add_line(INVALID_INPUT_MSG)
+                return
         # beyond here lies debug commands
         # elif self.debug and command[:2] == "ff":
         #     self.combat(ct_npc)
@@ -358,7 +433,9 @@ class Game:
             self.gui.main_out.add_line("DEBUG: Setting HP")
             self.player.hp = int(command[2:].strip())
         elif self.debug and command[:5] == "tpdim":
-            self.portal_into_another_dimension(dim_num=int(command[5:].strip()))
+            self.portal_into_another_dimension(
+                dim_num=int(command[5:].strip() or self.player.tile_index + 1)
+            )
         elif self.debug and (command[:2] == "tp" or command[:4] == "tele"):
             try:
                 tc = command.split(" ")[1]
@@ -371,7 +448,7 @@ class Game:
                 return
             if self.current_tile._check_valid_coords(tc):
                 self.player.x, self.player.y = tc
-                self.current_tile.explored.add((self.player.x, self.player.y))
+                self.current_tile.explored.add(self.player.coordinates)
                 self.gui.main_out.add_line("poof~")
             else:
                 self.gui.main_out.add_line("off-map coordinates not allowed")
@@ -391,12 +468,20 @@ class Game:
         """
         self.gui.main_out.add_line("")
         command = sanitize_input(command)
-        if self.game_state == GameState.in_map:
-            return self.map_turn(command)
-        elif self.game_state == GameState.in_combat:
-            return self.combat(command)
-        else:
-            raise ValueError(f"Invalid Game State '{self.game_state}'")
+        match self.game_state:
+            case GameState.in_map:
+                return self.map_turn(command)
+            case GameState.in_combat:
+                return self.combat(command)
+            case GameState.in_conversation:
+                convo = self.interaction.in_conversation_with.conversation
+                assert convo
+                out = convo.respond(self.player, command)
+                self.gui.main_out.add_line(out)
+                if convo.has_ended:
+                    self.end_conversation()
+            case _:
+                raise ValueError(f"Invalid Game State '{self.game_state}'")
 
 
 if __name__ == "__main__":

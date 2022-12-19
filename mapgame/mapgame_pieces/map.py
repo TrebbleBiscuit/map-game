@@ -3,6 +3,14 @@ from mapgame_pieces.alive import NPC
 import math
 import random
 from dataclasses import dataclass
+from mapgame_pieces.conversations import (
+    Conversation,
+    TestConversation,
+    RiddleConvo,
+    IntroConvo,
+    WisdomConvo,
+    NoConversation,
+)
 
 logger = logging.getLogger(__name__)
 BASE_NPCS_PER_TILE = 7
@@ -43,11 +51,48 @@ class Tile:
         )  # had to put the tuple in a list to get it to turn into a set of tuples
         self.paths = self.generate_paths(self.width * self.height)
         self.all_visible = False
+        self.add_hostile_npcs_to_tile(level)
+        self.add_friendly_npc_to_tile(level)
+
+    def add_hostile_npcs_to_tile(self, level: int):
         number_of_npcs = BASE_NPCS_PER_TILE + min(int(level / 6), 3)
         self.npcs = [NPC.generate_from_level(level) for x in range(number_of_npcs)]
         for npc in self.npcs:
             npc.x, npc.y = self.gen_random_coordinates()
             logger.debug(f"NPC spawned at {(npc.x, npc.y)}")
+
+    def make_conversation(self):
+
+        all_conversations = [
+            RiddleConvo(
+                self,
+                riddle_text="What has four paws and rhymes with 'rat'?",
+                correct_answers=("cat", "rat"),
+            ),
+            IntroConvo(self),
+            WisdomConvo(self),
+            WisdomConvo(
+                self,
+                f"There are {len(self.chests)} unopened chests and {len(self.npcs) + 1} living creatures on this floor.",
+            ),
+        ]
+
+        return random.choice(all_conversations)
+
+    def add_friendly_npc_to_tile(self, level: int):
+        adj = random.choice(["old", "young", "bald", "spirited", "steadfast", "calm"])
+        noun = random.choice(["man", "woman", "person", "human", "wanderer"])
+        f_npc = NPC.generate_from_level(level + 2)
+        f_npc.player_attitude = 1
+        f_npc.x, f_npc.y = self.gen_random_coordinates()
+        convo = self.make_conversation()
+        if isinstance(convo, WisdomConvo):
+            adj = "wise"
+        elif isinstance(convo, IntroConvo):
+            adj = "helpful"
+        f_npc.name = adj + " " + noun
+        f_npc.conversation = self.make_conversation()
+        self.npcs.append(f_npc)
 
     def _starting_rooms(self) -> RoomMap:
         rooms = {}

@@ -3,7 +3,7 @@ from mapgame_pieces.alive import LivingThing
 from mapgame_pieces.utils import color_string
 from mapgame_pieces.items import Item
 import logging
-
+from dataclasses import dataclass
 import json
 from pathlib import Path
 
@@ -28,7 +28,7 @@ class Inventory:
         self._item_map: ItemMap = {  # this will be more useful when items are unique
             "Bullet": Item("Bullet"),
         }
-        self._equipped = {"melee": None, "ranged": None, "armor": None}
+        self._equipped: EquippedMap = {"melee": None, "ranged": None, "armor": None}
 
     @property
     def contents(self) -> InventoryContents:
@@ -70,6 +70,22 @@ class Inventory:
             self._contents.pop(to_remove)
 
 
+@dataclass
+class Abilities:
+    def __init__(self, saved: dict | None = None):
+        self.passive_heal_double = False
+        self.reduced_humanity_loss = False
+        if saved:
+            self.from_saved(saved)
+
+    def to_save(self):
+        return {key: val for key, val in self.__dict__.items() if val}
+
+    def from_saved(self, saved):
+        for key, val in saved.items():
+            setattr(self, key, val)
+
+
 class Player(LivingThing):
     def __init__(self, gui: "GUIWrapper"):
         super().__init__()
@@ -78,13 +94,31 @@ class Player(LivingThing):
         self.hp = self.max_hp
         self.attack_power = 4  # base melee damage
         self.inventory = Inventory()
+        self.abilities = Abilities()
         self.money = 0
         self.level = 1
         self.xp = 0
-        self.humanity = 100  # out of 100
+        self._humanity = 100  # out of 100
         self.time = 0
         if SAVE_PATH.exists():
             self.load_from_file()
+
+    @property
+    def humanity(self) -> int:
+        return self._humanity
+
+    @humanity.setter
+    def humanity(self, val: int):
+        if val > 100:
+            val = 100
+
+        diff = val - self._humanity
+        if diff < -1 and (val <= 0 or self.abilities.reduced_humanity_loss):
+            val += 1
+            if diff < -9:
+                val += 1
+
+        self._humanity = val
 
     @property
     def gun_aiming(self) -> int:
@@ -103,6 +137,7 @@ class Player(LivingThing):
             "xp": self.xp,
             "humanity": self.humanity,
             "inventory_contents": self.inventory.contents,
+            "abilities": self.abilities.to_save(),
         }
         with open(SAVE_PATH, "w") as savefile:
             json.dump(save_data, savefile)
@@ -114,6 +149,8 @@ class Player(LivingThing):
         for entry, value in save_data.items():
             if entry == "inventory_contents":
                 self.inventory = Inventory(contents=value)
+            elif entry == "abilities":
+                self.abilities = Abilities(saved=value)
             else:
                 setattr(self, entry, value)
 
@@ -125,15 +162,12 @@ class Player(LivingThing):
             lvl_txt = "[bold green]You have leveled up![/bold green]"
             self.gui.main_out.add_line(lvl_txt)
             self.level += 1
-            self.gui.main_out.add_line(f"You are now level {self.level}.")
-            # ap_txt = color_string(f"attack power", Style.BRIGHT)
-            ap_txt = "attack power"
-            self.gui.main_out.add_line(f"You gain 1 {ap_txt}!")
             self.attack_power += 1
-
-            self.gui.main_out.add_line("You gain 5 max HP!")
             self.max_hp += 5
             self.hp += 5
+            self.gui.main_out.add_line(
+                f"You are now level {self.level}. (+1 ATK, +5 Max HP)"
+            )
 
             # heal up to ~15% health
             self.heal_up_to(int(self.max_hp / 6))
@@ -172,7 +206,6 @@ class Player(LivingThing):
         hp_txt = color_string(str(rec), "Fore.GREEN")
         self.gui.main_out.add_line(f"You recover {hp_txt} HP!")
         self.hp += rec
-        self.gui.main_out.add_line(f"You are now at {self.hp}/{self.max_hp} HP!")
 
     def heal_up_to(self, up_to: int):
         hp_missing = up_to - self.hp
@@ -183,6 +216,13 @@ class Player(LivingThing):
         # if self.hp < self.max_hp:
         #     self.gui.main_out.add_line("You regain some HP")
         super()._heal_over_time()
+        if self.abilities.passive_heal_double:
+            super()._heal_over_time()
         # if self.hp < self.max_hp:
         #     # player heals twice as fast
         #     self.hp += 1
+
+    def grant_ability(self, ability_name: str):
+        if not getattr(self.abilities, ability_name):
+            self.gui.main_out.add_line("You have learned a new ability!")
+            setattr(self.abilities, ability_name, True)

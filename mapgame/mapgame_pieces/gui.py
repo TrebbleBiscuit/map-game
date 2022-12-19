@@ -1,7 +1,6 @@
-from itertools import cycle
 from rich import markup
 from textual.app import App, ComposeResult
-from textual.widgets import Header, Footer, Static, Input
+from textual.widgets import Header, Static, Input, TextLog
 
 
 def make_15_chars_long(string: str) -> str:
@@ -11,24 +10,9 @@ def make_15_chars_long(string: str) -> str:
     return string + n_spaces * " "
 
 
-class OutputWindow(Static):
+class OutputWindow(TextLog):
     def add_line(self, new_content: str):
-        old_content = self.render()
-        # logger.debug("%s newlines in old content", str(old_content).count("\n"))
-        to_trunc = (
-            str(old_content).count("\n")
-            + new_content.count("\n")
-            + 3
-            - (self.content_size.height or 10)  # see following note for why 'or 10'
-        )
-        # 'or 10' because on_mount() height isn't set yet, so it comes across as 0
-        # set it to 10 instead so that we don't try and truncate nonexistent newlines
-        if to_trunc > 0:
-            # truncate content to give the appearance of scrolling
-            old_content = str(old_content).split("\n", to_trunc)[to_trunc]
-        self.update(old_content + "\n" + new_content)
-
-        # logger.debug(self.content_size.height)
+        self.write(new_content)
 
 
 class GUIWrapper(App):
@@ -38,7 +22,7 @@ class GUIWrapper(App):
     def __init__(self, game):
         super().__init__()
         self.stats_out = Static("Stats", classes="box")
-        self.main_out = OutputWindow("Welcome to mapgame!", classes="box", id="tallboi")
+        self.main_out = OutputWindow(classes="box", id="tallboi")
         self.map_out = Static("Map", classes="box")
         self.default_input_placeholder = "Type a command and press enter"
         self.main_in = Input(
@@ -63,6 +47,10 @@ class GUIWrapper(App):
 
     def update_map(self):
         # escape markup so that `[n]` stays that way instead of disappearing
+
+        if self.game.game_state.value != 1:  # in_map
+            self.map_out.update(self.game.game_state.name.replace("_", " "))
+            return
         map_now = markup.escape(
             self.game.current_tile.get_map(self.game.player.x, self.game.player.y)
         )
