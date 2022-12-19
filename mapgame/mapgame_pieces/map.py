@@ -9,7 +9,7 @@ from mapgame_pieces.conversations import (
     RiddleConvo,
     IntroConvo,
     WisdomConvo,
-    NoConversation,
+    BuffConvo,
 )
 
 logger = logging.getLogger(__name__)
@@ -75,6 +75,7 @@ class Tile:
                 npc,
                 f"There are {len(self.chests)} unopened chests and {len(self.npcs) + 1} living creatures on this floor.",
             ),
+            BuffConvo(npc),
         ]
 
         return random.choice(all_conversations)
@@ -85,6 +86,8 @@ class Tile:
         f_npc = NPC.generate_from_level(level + 2)
         f_npc.player_attitude = 1
         f_npc.x, f_npc.y = self.gen_random_coordinates()
+        # if level == 1:
+        #     convo = IntroConvo(npc=f_npc)
         convo = self.make_conversation(npc=f_npc)
         if isinstance(convo, WisdomConvo):
             adj = "wise"

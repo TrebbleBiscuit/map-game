@@ -2,7 +2,7 @@ import random
 import logging
 
 logger = logging.getLogger(__name__)
-LEAVE_OPTIONS = ["leave", "exit"]
+LEAVE_OPTIONS = ["leave", "exit", "l"]
 
 
 class Conversation:
@@ -40,6 +40,7 @@ class WisdomConvo(Conversation):
         super().__init__(npc)
         self.given_wisdom = 0
         self.custom_wisdom = custom_wisdom
+        self.can_leave = False
 
     def prompt(self) -> str:
         if self.given_wisdom == 0:
@@ -92,6 +93,66 @@ class WisdomConvo(Conversation):
                 return f"{another} shouldnt be in possible wisdom rip PLS REPORT THIS"
 
 
+class BuffConvo(Conversation):
+    def __init__(self, npc):
+        super().__init__(npc)
+        self.given_buff = 0
+
+    def prompt(self) -> str:
+        if self.given_buff == 0:
+            return self.wrap_in_quotes(
+                "Hello, traveler! You look like you could use a hand."
+            )
+        else:
+            return self.wrap_in_quotes("That should help you out. Good luck out there.")
+
+    def respond(self, player: "Player", to_say: str) -> str:
+        if to_say in LEAVE_OPTIONS or self.given_buff:
+            if self.exit_conversation():
+                if to_say in THANKS:
+                    bye = "Happy to be of service! Be safe!"
+                else:
+                    bye = "Be safe!"
+                return self.wrap_in_quotes(bye)
+            else:
+                return self.wrap_in_quotes(
+                    "Wait, don't leave just yet! I've got something for you."
+                )
+
+        self.given_buff += 1
+        self.can_leave = True
+
+        possible_buffs = ["bless_res"]
+        if player.humanity < 85:
+            possible_buffs.append("humanity")
+        elif player.max_hp - player.hp > 20:
+            possible_buffs.append("heal")
+
+        out_msg = f"The {self.npc.name} chants in a low voice in a strange language. "
+        match random.choice(possible_buffs):
+            case "bless_res":
+                player.flags.blessed_revive += 1
+                return (
+                    out_msg
+                    + "You feel a surge of confidence, like someone is looking out for you!"
+                )
+            case "humanity":
+                # TODO
+                player.humanity += 15
+                return out_msg + "Your mind suddenly clears and you feel more focused!"
+            case "heal":
+                player.hp += 20
+                return (
+                    out_msg
+                    + "Some of your wounds miraculously stitch themselves together!"
+                )
+            case _ as another:
+                logger.error(
+                    f"{self.npc.name} attempted to bestow the following unhandled buff: {another}"
+                )
+                return f"{another} shouldnt be in possible buffs rip PLS REPORT THIS"
+
+
 class IntroConvo(Conversation):
     def __init__(self, npc):
         super().__init__(npc)
@@ -116,7 +177,7 @@ class IntroConvo(Conversation):
             )
         elif self.stage == 4:
             return self.wrap_in_quotes(
-                "Oh, just so you know, you can type `leave` or `exit` to end most conversations."
+                "Oh, just so you know, you can type `leave` or `exit` to prematurely end most conversations."
             )
         elif self.stage == 5:
             return self.wrap_in_quotes("Anyway, take care!")

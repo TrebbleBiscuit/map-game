@@ -89,7 +89,8 @@ class Abilities:
 @dataclass
 class Flags:
     def __init__(self, saved: dict | None = None):
-        self.medium_humanity_warning = False
+        self.humanity_warning_level = 0
+        self.blessed_revive = 0
 
         if saved:
             self.from_saved(saved)
@@ -135,10 +136,24 @@ class Player(LivingThing):
             if diff < -9:
                 val += 1
 
-        if val < 80 and not self.flags.medium_humanity_warning:
-            self.flags.medium_humanity_warning = True
-            warn_msg = "As you lose a part of your humanity, you hear dark whispers at the edge of your focus..."
+        warn_lvl = self.flags.humanity_warning_level
+        if val < 80 and warn_lvl == 0:
+            self.flags.humanity_warning_level = 1
+            warn_msg = "As you lose another part of your humanity, you begin to feel a benign sense of unease..."
             self.gui.main_out.add_line(warn_msg)
+        elif val < 60 and warn_lvl == 1:
+            self.flags.humanity_warning_level = 2
+            warn_msg = "As you lose more of your humanity, you begin to hear dark whispers at the edge of your focus..."
+            self.gui.main_out.add_line(warn_msg)
+        elif val < 40 and warn_lvl == 2:
+            self.flags.humanity_warning_level = 3
+            warn_msg = "It is getting harder to ignore the whispers. To fight away the sense of hopeless despair..."
+            self.gui.main_out.add_line(warn_msg)
+        elif val < 20 and warn_lvl == 3:
+            self.flags_humanity_warning_level = 4
+            warn_msg = "There is less and less human about you all the time, but you're still in control of yourself for now..."
+            self.gui.main_out.add_line(warn_msg)
+            self.gui.main_out.add_line("Right?")
 
         self._humanity = val
 
@@ -215,25 +230,69 @@ class Player(LivingThing):
         self.gui.main_out.add_line(f"You gained {money} money!")
         self.money += money
 
-    def take_damage(self, dmg: int):
-        ouch = random.choice(["Ouch", "Oof", "Owwie", "Yikes", "Oh no"])
-        self.gui.main_out.add_line(f"{ouch}! You take {dmg} damage!")
-        self.hp -= dmg
-        if self.hp <= 0:
-            self.hp = 0  # maybe rm this? the idea of overkill affecting your next hp pool is cool
+    def game_over(self):
+        logger.info(f"GAME OVER - Score: {self.score}")
+        self.gui.main_out.add_line("Your humanity drops to zero!")
+        self.gui.main_out.add_line(
+            "No longer will you rise to fight the endless hoard of monsters."
+        )
+        self.gui.main_out.add_line("Instead you are doomed to wander among them.")
+        self.gui.main_out.add_line(f"Your final score is {self.score}")
+        self.gui.main_out.add_line(
+            "delete your save file if you want, or just keep playing"
+        )
+
+    def revive(self, cursed=False, blessed=False):
+        if not blessed and self.flags.blessed_revive:
+            self.flags.blessed_revive -= 1
+            blessed = True
+        if blessed:
+            humanity_loss = 0
+            recover_ratio = 1
+        elif cursed:
+            humanity_loss = 13
+            recover_ratio = 0.7
+        else:
+            humanity_loss = 10
+            recover_ratio = 0.9
+        self.humanity -= humanity_loss
+        if self.humanity <= 0:
+            self.game_over()
+        if blessed:
             self.gui.main_out.add_line(
-                "Your HP drops to zero! You collapse to your knees, feeling weak..."
+                "Suddenly a feeling of holy power overwhelms you! You feel refreshed and recovered!"
             )
+        elif cursed:
+            self.gui.main_out.add_line(
+                "Suddenly an unholy feeling of cursed power overwhelms you!"
+            )
+            self.gui.main_out.add_line(
+                "You scream out in rage, and then everything goes black..."
+            )
+            self.gui.main_out.add_line("")
+            self.gui.main_out.add_line(
+                "When you come to, there is nothing left of the hostiles but mutilated corpses. Was this your doing..?"
+            )
+        else:
             self.gui.main_out.add_line(
                 "Suddenly a feeling of malicious power overwhelms you! You feel refreshed, but at what cost?"
             )
-            self.humanity -= 10
-            self.recover_hp(int(self.max_hp * 0.9))
-            if self.humanity <= 0:
-                self.gui.main_out.add_line("humanity <= 0; GAME OVER")
-                self.gui.main_out.add_line(
-                    "delete your save file if you want, or just keep playing"
-                )
+        self.recover_hp(int(self.max_hp * recover_ratio))
+
+    def take_damage(self, dmg: int) -> bool:
+        """return True if you died"""
+        ouch = random.choice(["Ouch", "Oof", "Owwie", "Yikes", "Oh no"])
+        self.gui.main_out.add_line(f"{ouch}! You take {dmg} damage!")
+        self.hp -= dmg
+        if self.hp >= 0:
+            return False
+        self.hp = (
+            0  # maybe rm this? the idea of overkill affecting your next hp pool is cool
+        )
+        self.gui.main_out.add_line(
+            "Your HP drops to zero! You collapse to your knees, feeling weak..."
+        )
+        return True
 
     def recover_hp(self, rec: int):
         hp_missing = self.max_hp - self.hp

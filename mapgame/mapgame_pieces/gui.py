@@ -22,7 +22,7 @@ class GUIWrapper(App):
     def __init__(self, game):
         super().__init__()
         self.stats_out = Static("Stats", classes="box")
-        self.main_out = OutputWindow(classes="box", id="tallboi")
+        self.main_out = OutputWindow(wrap=True, classes="box", id="tallboi")
         self.map_out = Static("Map", classes="box")
         self.default_input_placeholder = "Type a command and press enter"
         self.main_in = Input(

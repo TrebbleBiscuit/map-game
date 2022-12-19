@@ -27,6 +27,7 @@ class GameState(Enum):
 @dataclass
 class CurrentInteraction:
     in_combat_vs: list[NPC] = field(default_factory=list)
+    combat_revive_count = 0
     in_conversation_with: NPC | None = None
 
 
@@ -128,6 +129,7 @@ class Game:
         self.gui.main_out.add_line(
             "With combat behind you for now, it's time to keep exploring."
         )
+        self.interaction.combat_revive_count = 0
         self.interaction.in_combat_vs = []
         self.game_state = GameState.in_map
 
@@ -141,7 +143,8 @@ class Game:
             act_dmg = random.randint(min_dmg, max_dmg)
             self.gui.main_out.add_line(f"You take a swing at the {enemy_text}!")
             dmg_txt = color_string(f"{act_dmg} damage", "Fore.RED")
-            self.gui.main_out.add_line(f"You do [red]{dmg_txt}[/red]!")
+            dmg_flavor = self.get_dmg_flavor(act_dmg, min_dmg, base_dmg, max_dmg)
+            self.gui.main_out.add_line(f"You do [red]{dmg_txt}[/red]! {dmg_flavor}")
             if self.debug:
                 self.gui.main_out.add_line(f"DEBUG: ({min_dmg}-{max_dmg} dmg)")
             if hostile.take_damage(act_dmg):
@@ -149,6 +152,19 @@ class Game:
                     f"It falls to the ground and disappears in a flash of light!"
                 )
                 self.player.humanity += 1
+
+    def get_dmg_flavor(self, act_dmg, min_dmg, base_dmg, max_dmg):
+        if act_dmg == max_dmg:
+            flavor_txt = "A critical hit!!"
+        elif act_dmg > base_dmg:
+            flavor_txt = "A good hit!"
+        elif act_dmg == base_dmg:
+            flavor_txt = "An average hit!"
+        elif act_dmg == min_dmg:
+            flavor_txt = "A very weak hit!!"
+        else:
+            flavor_txt = "A glancing hit!"
+        return flavor_txt
 
     def shoot_attack_hostiles(self):
         """you know like with a gun"""
@@ -161,8 +177,9 @@ class Game:
         enemy_text = color_string(f"{hostile.name}", "Fore.RED")
         self.gui.main_out.add_line(f"You aim at the {enemy_text} and pull the trigger!")
         if hit:
+            dmg_flavor = self.get_dmg_flavor(act_dmg, min_dmg, base_dmg, max_dmg)
             dmg_txt = color_string(f"{act_dmg} damage", "Fore.RED")
-            self.gui.main_out.add_line(f"You do {dmg_txt}!")
+            self.gui.main_out.add_line(f"You do {dmg_txt}! {dmg_flavor}")
             if self.debug:
                 self.gui.main_out.add_line(f"DEBUG: ({min_dmg}-{max_dmg} dmg)")
             if hostile.take_damage(act_dmg):
@@ -219,6 +236,9 @@ class Game:
             self.end_combat()
             return
         for hostile in self.interaction.in_combat_vs:
+            # make sure we're still in combat each turn
+            if self.game_state != GameState.in_combat:
+                return
             self.hostile_combat_turn(hostile)
         self.gui.main_out.add_line("")
 
@@ -227,22 +247,42 @@ class Game:
         min_dmg = int((base_dmg * 0.7) + 0.5)
         max_dmg = int(base_dmg * 1.3)
         act_dmg = random.randint(min_dmg, max_dmg)
+        dmg_flavor = self.get_dmg_flavor(act_dmg, min_dmg, base_dmg, max_dmg)
         enemy_text = color_string(f"{hostile.name}", "Fore.RED")
-        self.gui.main_out.add_line(f"The {enemy_text} attacks you!")
+        self.gui.main_out.add_line(
+            f"The {enemy_text} attacks you, scoring {dmg_flavor.lower()}"
+        )
         # dmg_txt = color_string(f"{act_dmg} damage", "Fore.RED")
         # self.gui.main_out.add_line(
         #     f"It connects for ({min_dmg}-{max_dmg}) {dmg_txt}!",
         # )
         if self.debug:
             self.gui.main_out.add_line(f"DEBUG: ({min_dmg}-{max_dmg}) enemy dmg")
-        self.player.take_damage(act_dmg)
+        if self.player.take_damage(act_dmg):
+            # player 'died'
+            self.interaction.combat_revive_count += 1
+            if self.interaction.combat_revive_count >= 3:
+                self.bail_player_out_of_combat()
+            else:
+                self.player.revive()
+
+    def bail_player_out_of_combat(self):
+        """player died too many times, bail them out
+        they get a 'cursed' revive and no rewards from combat
+        """
+        for npc in self.interaction.in_combat_vs:
+            npc.take_damage(npc.hp)
+        self.player.revive(cursed=True)
+        self.end_combat()
 
     def get_chest_contents(self) -> tuple[str, int]:
         choices = [
-            ("Bullet", random.randint(3, int(self.player.level / 2) + 3)),
+            ("Bullet", random.randint(3, int(self.player.tile_index / 2) + 3)),
             (
                 "money",
-                random.randint(self.player.level + 2, (self.player.level + 2) * 2),
+                random.randint(
+                    self.player.tile_index + 2, (self.player.tile_index + 2) * 2
+                ),
             ),
         ]
         return random.choice(choices)
@@ -374,7 +414,7 @@ class Game:
             self.exit_limbo()
         elif (
             command in ["pay", "tithe"]
-            and self.player.humanity <= 90
+            and self.player.humanity < 80
             and self.player.money >= 10
         ):
             cost_per = 2
