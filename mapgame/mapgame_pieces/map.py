@@ -61,18 +61,18 @@ class Tile:
             npc.x, npc.y = self.gen_random_coordinates()
             logger.debug(f"NPC spawned at {(npc.x, npc.y)}")
 
-    def make_conversation(self):
+    def make_conversation(self, npc):
 
         all_conversations = [
             RiddleConvo(
-                self,
+                npc,
                 riddle_text="What has four paws and rhymes with 'rat'?",
                 correct_answers=("cat", "rat"),
             ),
-            IntroConvo(self),
-            WisdomConvo(self),
+            IntroConvo(npc),
+            WisdomConvo(npc),
             WisdomConvo(
-                self,
+                npc,
                 f"There are {len(self.chests)} unopened chests and {len(self.npcs) + 1} living creatures on this floor.",
             ),
         ]
@@ -85,13 +85,13 @@ class Tile:
         f_npc = NPC.generate_from_level(level + 2)
         f_npc.player_attitude = 1
         f_npc.x, f_npc.y = self.gen_random_coordinates()
-        convo = self.make_conversation()
+        convo = self.make_conversation(npc=f_npc)
         if isinstance(convo, WisdomConvo):
             adj = "wise"
         elif isinstance(convo, IntroConvo):
             adj = "helpful"
         f_npc.name = adj + " " + noun
-        f_npc.conversation = self.make_conversation()
+        f_npc.conversation = convo
         self.npcs.append(f_npc)
 
     def _starting_rooms(self) -> RoomMap:

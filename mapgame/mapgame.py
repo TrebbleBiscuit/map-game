@@ -67,6 +67,7 @@ class Game:
     def exit_limbo(self):
         self.gui.main_in.placeholder = self.gui.default_input_placeholder
         self.game_state = GameState.in_map
+        self.player.save_to_file()
 
     def enter_conversation(self, npc: NPC):
         # self.gui.map_out.update("")
@@ -278,6 +279,9 @@ class Game:
         self.gui.main_out.add_line(f"You portal into dimension #{dim_num}")
         if self.player.humanity > 5:
             self.player.humanity -= 1
+        elif self.player.humanity > 1:
+            if random.random() == 0.5:
+                self.player.humanity -= 1
         self.player.grant_xp(dim_num * 3 + random.randint(4, 10))
         self.current_tile = self.map.get_tile(dim_num)
         self.player.save_to_file()
@@ -346,11 +350,17 @@ class Game:
             out = self.interaction.in_conversation_with.conversation.prompt()
             self.gui.main_out.add_line(out)
         elif self.game_state == GameState.in_limbo:
-            if self.player.humanity < 80 and self.player.money >= 10:
+            self.gui.main_out.add_line(
+                "You exist in a state of limbo; a world between worlds."
+            )
+            self.gui.main_out.add_line(
+                f"You take a moment to reflect. Your current score is {self.player.score}"
+            )
+            if self.player.humanity <= 90 and self.player.money >= 10:
                 self.gui.main_out.add_line(
                     "You can pay tithe to regain humanity (2c/h)"
                 )
-            if self.player.humanity < 80 and self.player.humanity > 20:
+            if self.player.humanity <= 80 and self.player.humanity >= 20:
                 self.gui.main_out.add_line("You could pray to the dark gods")
             self.gui.main_out.add_line("You can continue onward to exit limbo")
         else:
@@ -358,12 +368,21 @@ class Game:
 
     def limbo_turn(self, command: str):
         if command in ["continue", "c", "down", "go", "leave", "exit"]:
-            self.exit_limbo()
-        elif command in ["pay", "tithe"] and self.player.humanity < 80 and self.player.money >= 10:
-            pay = min(4, player.money // 10) * 10
-            regain = pay // 2
             self.gui.main_out.add_line(
-                "You exchange {pay} money for {regain} humanity!"
+                "An indescribable feeling washes over you as you exit limbo!"
+            )
+            self.exit_limbo()
+        elif (
+            command in ["pay", "tithe"]
+            and self.player.humanity <= 90
+            and self.player.money >= 10
+        ):
+            cost_per = 2
+            max_cost = (100 - self.player.humanity) * cost_per
+            pay = min(self.player.money, max_cost)
+            regain = pay // cost_per
+            self.gui.main_out.add_line(
+                f"You exchange {pay} money for {regain} humanity!"
             )
             self.player.money -= pay
             self.player.humanity += regain
@@ -484,6 +503,10 @@ class Game:
                 self.gui.main_out.add_line("poof~")
             else:
                 self.gui.main_out.add_line("off-map coordinates not allowed")
+        elif self.debug and command == "npc":
+            self.gui.main_out.add_line(
+                str({x.name: x.coordinates for x in self.current_tile.npcs})
+            )
         else:
             self.gui.main_out.add_line(INVALID_INPUT_MSG)
         # after that, check to see if we're in combat

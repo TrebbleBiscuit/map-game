@@ -134,7 +134,7 @@ class Player(LivingThing):
             val += 1
             if diff < -9:
                 val += 1
-        
+
         if val < 80 and not self.flags.medium_humanity_warning:
             self.flags.medium_humanity_warning = True
             warn_msg = "As you lose a part of your humanity, you hear dark whispers at the edge of your focus..."
@@ -164,6 +164,17 @@ class Player(LivingThing):
         }
         with open(SAVE_PATH, "w") as savefile:
             json.dump(save_data, savefile)
+
+    @property
+    def score(self):
+        return (
+            self.max_hp
+            + self.xp
+            + (self.level * 10)
+            + (self.tile_index * 20)
+            + (len(self.abilities.to_save()) * 20)
+            + self.humanity
+        )
 
     def load_from_file(self):
         logger.debug("Loading save from %s", SAVE_PATH)

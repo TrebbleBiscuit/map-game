@@ -1,5 +1,7 @@
 import random
+import logging
 
+logger = logging.getLogger(__name__)
 LEAVE_OPTIONS = ["leave", "exit"]
 
 
@@ -49,9 +51,14 @@ class WisdomConvo(Conversation):
 
     def respond(self, player: "Player", to_say: str) -> str:
         if to_say in LEAVE_OPTIONS or self.given_wisdom:
-            self.exit_conversation()
-            return self.wrap_in_quotes("Good luck on your journey.")
+            if self.exit_conversation():
+                return self.wrap_in_quotes("Good luck on your journey.")
+            else:
+                return self.wrap_in_quotes("Wait, let me bestow my wisdom first!")
+
         self.given_wisdom += 1
+        self.can_leave = True
+        self.exit_conversation()
 
         if self.custom_wisdom:
             return self.wrap_in_quotes(self.custom_wisdom)
@@ -65,7 +72,7 @@ class WisdomConvo(Conversation):
             possible_wisdom.append("reduced_humanity_loss")
 
         out_msg = f"The {self.npc.name}'s wisdom "
-        match self.this_wisdom:
+        match random.choice(possible_wisdom):
             case "xp":
                 player.grant_xp(player.level * 4 + 10)
                 return out_msg + "gives you a sense of experience!"
@@ -79,7 +86,10 @@ class WisdomConvo(Conversation):
                 player.grant_ability("reduced_humanity_loss")
                 return out_msg + "teaches you to reduce your humanity losses!! Wow!"
             case _ as another:
-                return f"{another} shouldnt be here rip"
+                logger.error(
+                    f"{self.npc.name} attempted to bestow the following unhandled wisdom type: {another}"
+                )
+                return f"{another} shouldnt be in possible wisdom rip PLS REPORT THIS"
 
 
 class IntroConvo(Conversation):

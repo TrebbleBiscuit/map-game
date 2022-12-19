@@ -69,6 +69,9 @@ class GUIWrapper(App):
         stats += make_15_chars_long(f"Depth: {self.game.player.tile_index}")
         stats += "\n"
         stats += f"Inv: {self.game.player.inventory.contents}"
+        if self.game.debug:
+            stats += "\n"
+            stats += make_15_chars_long(f"Score: {self.game.player.score}")
         self.stats_out.update(stats)
 
     async def on_input_submitted(self, message: Input.Submitted):
