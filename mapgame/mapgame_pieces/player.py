@@ -6,6 +6,7 @@ import logging
 from dataclasses import dataclass
 import json
 from pathlib import Path
+from enum import Enum
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +18,76 @@ EquippedMap = dict[str, Item | None]
 
 SAVE_PATH = Path("mapgame.mapsave")
 logger = logging.getLogger(__name__)
+
+
+class ArmorSlot(str, Enum):
+    head = "head"
+    chest = "chest"
+    legs = "legs"
+    feet = "feet"
+
+
+class ArmorModifier(str, Enum):
+    plain = "plain"
+    blessed = "blessed"
+    cursed = "cursed"
+
+
+class ArmorPiece:
+    def __init__(self, saved=None):
+        self.armor_slot: ArmorSlot = ArmorSlot.head
+        self.armor_amount: int = 1
+        self.modifier: ArmorModifier = ArmorModifier.plain
+        self.name: str = "generic helmet"
+
+        if saved:
+            self.from_saved(saved)
+
+    @property
+    def name_str(self):
+        return self.modifier.name + " " + self.name
+
+    def from_saved(self, saved):
+        for key, val in saved.items():
+            if key == "armor_slot":
+                setattr(self, key, ArmorSlot(val))
+            elif key == "modifier":
+                setattr(self, key, ArmorModifier(val))
+            else:
+                setattr(self, key, val)
+
+
+class EquippedArmor:
+    def __init__(self, saved=None):
+        for slot in ArmorSlot:
+            setattr(self, slot.name, None)
+        if saved:
+            self.from_saved(saved)
+
+    def equip(self, to_equip: ArmorPiece):
+        slot = to_equip.armor_slot.name
+        already_equipped = getattr(self, slot)
+        if already_equipped:
+            # TODO: 'you remove the x you're already wearing'
+            ...
+        setattr(self, slot, to_equip)
+        # TODO: 'you equip the x'
+
+    @property
+    def armor_score(self) -> int:
+        total = 0
+        for slot in ArmorSlot:
+            this_slot = getattr(self, slot.name)
+            if this_slot:
+                total += this_slot.armor_amount
+        return total
+
+    def to_save(self) -> dict:
+        return self.__dict__
+
+    def from_saved(self, saved):
+        for key, val in saved.items():
+            setattr(self, key, ArmorPiece(saved=val))
 
 
 class Inventory:
@@ -78,7 +149,7 @@ class Abilities:
         if saved:
             self.from_saved(saved)
 
-    def to_save(self):
+    def to_save(self) -> dict:
         return {key: val for key, val in self.__dict__.items() if val}
 
     def from_saved(self, saved):
@@ -282,9 +353,6 @@ class Player(LivingThing):
                 "You scream out in rage, and then everything goes black..."
             )
             self.gui.main_out.add_line("")
-            self.gui.main_out.add_line(
-                "When you come to, there is nothing left of the hostiles but mutilated corpses. Was this your doing..?"
-            )
         else:
             malicious_power_txt = color_string(
                 "Suddenly a feeling of malicious power overwhelms you!",

@@ -291,6 +291,9 @@ class Game:
         for npc in self.interaction.in_combat_vs:
             npc.take_damage(npc.hp)
         self.player.revive(cursed=True)
+        self.gui.main_out.add_line(
+            "When you come to, there is nothing left of the hostiles but mutilated corpses. Was this your doing..?"
+        )
         self.end_combat()
 
     def get_chest_contents(self) -> tuple[str, int]:
