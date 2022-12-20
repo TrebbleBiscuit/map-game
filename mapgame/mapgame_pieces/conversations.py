@@ -1,5 +1,6 @@
 import random
 import logging
+from mapgame_pieces.utils import color_string
 
 logger = logging.getLogger(__name__)
 LEAVE_OPTIONS = ["leave", "exit", "l"]
@@ -24,7 +25,7 @@ class Conversation:
 
     def wrap_in_quotes(self, quote: str) -> str:
         """Wrap in quotes and print to main_out"""
-        return f'"{quote}"'
+        return color_string(f'"{quote}"', "dialogue")
 
     def respond(self, player: "Player", to_say: str) -> str:
         ...
@@ -73,25 +74,26 @@ class WisdomConvo(Conversation):
         if not player.abilities.reduced_humanity_loss:
             possible_wisdom.append("reduced_humanity_loss")
 
-        out_msg = f"The {self.npc.name}'s wisdom "
+        msg_1 = f"The {self.npc.name_str}'s wisdom "
         match random.choice(possible_wisdom):
             case "xp":
                 player.grant_xp(player.level * 4 + 10)
-                return out_msg + "gives you a sense of experience!"
+                msg_2 = "gives you a sense of experience!"
             case "humanity":
                 player.humanity += 15
-                return out_msg + "makes you feel more clearheaded!"
+                msg_2 = "makes you feel more clearheaded!"
             case "passive_heal_double":
                 player.grant_ability("passive_heal_double")
-                return out_msg + "teaches you to passively heal twice as fast!! Wow!"
+                msg_2 = "teaches you to passively heal twice as fast!! Wow!"
             case "reduced_humanity_loss":
                 player.grant_ability("reduced_humanity_loss")
-                return out_msg + "teaches you to reduce your humanity losses!! Wow!"
+                msg_2 = "teaches you to reduce your humanity losses!! Wow!"
             case _ as another:
                 logger.error(
-                    f"{self.npc.name} attempted to bestow the following unhandled wisdom type: {another}"
+                    f"{self.npc.name_str} attempted to bestow the following unhandled wisdom type: {another}"
                 )
                 return f"{another} shouldnt be in possible wisdom rip PLS REPORT THIS"
+        return msg_1 + color_string(msg_2, "good_thing_happened")
 
 
 class BuffConvo(Conversation):
@@ -149,7 +151,7 @@ class BuffConvo(Conversation):
                 )
             case _ as another:
                 logger.error(
-                    f"{self.npc.name} attempted to bestow the following unhandled buff: {another}"
+                    f"{self.npc.name_str} attempted to bestow the following unhandled buff: {another}"
                 )
                 return f"{another} shouldnt be in possible buffs rip PLS REPORT THIS"
 
@@ -276,7 +278,7 @@ class RiddleConvo(Conversation):
             return (
                 self.wrap_in_quotes(quote)
                 + "\n"
-                + f"The {self.npc.name} steps aside to let you pass."
+                + f"The {self.npc.name_str} steps aside to let you pass."
             )
         elif self.answered_correctly:
             return self.wrap_in_quotes("No no, you had it before!")

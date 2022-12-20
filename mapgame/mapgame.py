@@ -17,7 +17,7 @@ from mapgame_pieces.items import Item
 
 logger = logging.getLogger(__name__)
 
-INVALID_INPUT_MSG = color_string("Input not understood", "bright_black")
+INVALID_INPUT_MSG = color_string("Input not understood", "dim")
 MAP_WIDTH = 8
 MAP_HEIGHT = 4
 
@@ -123,14 +123,11 @@ class Game:
         self.interaction.in_combat_vs = hostiles
         self.game_state = GameState.in_combat
         if len(hostiles) == 1:
-            enemy_text = color_string(
-                f"{hostiles[0].name}", COLOR_SCHEME["hostile_name"]
+            self.gui.main_out.add_line(
+                f"\nEntered combat with a hostile {hostiles[0].name_str}!"
             )
-            self.gui.main_out.add_line(f"\nEntered combat with a hostile {enemy_text}!")
         else:
-            enemy_text = color_string(
-                ", ".join(h.name for h in hostiles), COLOR_SCHEME["hostile_name"]
-            )
+            enemy_text = ", ".join(h.name_str for h in hostiles)
             self.gui.main_out.add_line(f"\nEntered combat with hostiles: {enemy_text}!")
 
     def end_combat(self):
@@ -148,12 +145,11 @@ class Game:
         min_dmg = int((base_dmg * 0.5) + 0.5)
         max_dmg = int(base_dmg * 1.5)
         for hostile in self.interaction.in_combat_vs:
-            enemy_text = color_string(f"{hostile.name}", COLOR_SCHEME["hostile_name"])
             act_dmg = random.randint(min_dmg, max_dmg)
-            self.gui.main_out.add_line(f"You take a swing at the {enemy_text}!")
-            dmg_txt = color_string(f"{act_dmg} damage", COLOR_SCHEME["damage_done"])
+            self.gui.main_out.add_line(f"You take a swing at the {hostile.name_str}!")
+            dmg_txt = color_string(f"{act_dmg} damage", "damage_done")
             dmg_flavor = color_string(
-                self.get_dmg_flavor(act_dmg, min_dmg, base_dmg, max_dmg), "bright_black"
+                self.get_dmg_flavor(act_dmg, min_dmg, base_dmg, max_dmg), "dim"
             )
             self.gui.main_out.add_line(f"You do {dmg_txt}! {dmg_flavor}")
             if self.debug:
@@ -162,7 +158,7 @@ class Game:
                 self.gui.main_out.add_line(
                     color_string(
                         f"It falls to the ground and disappears in a flash of light!",
-                        COLOR_SCHEME["good_thing_happened"],
+                        "good_thing_happened",
                     )
                 )
                 self.player.humanity += 1
@@ -188,13 +184,14 @@ class Game:
         act_dmg = random.randint(min_dmg, max_dmg)
         hit = random.randint(0, 100) <= self.player.gun_aiming
         hostile = random.choice(self.interaction.in_combat_vs)
-        enemy_text = color_string(f"{hostile.name}", COLOR_SCHEME["hostile_name"])
-        self.gui.main_out.add_line(f"You aim at the {enemy_text} and pull the trigger!")
+        self.gui.main_out.add_line(
+            f"You aim at the {hostile.name_str} and pull the trigger!"
+        )
         if hit:
             dmg_flavor = color_string(
-                self.get_dmg_flavor(act_dmg, min_dmg, base_dmg, max_dmg), "bright_black"
+                self.get_dmg_flavor(act_dmg, min_dmg, base_dmg, max_dmg), "dim"
             )
-            dmg_txt = color_string(f"{act_dmg} damage", COLOR_SCHEME["damage_done"])
+            dmg_txt = color_string(f"{act_dmg} damage", "damage_done")
             self.gui.main_out.add_line(f"You do {dmg_txt}! {dmg_flavor}")
             if self.debug:
                 self.gui.main_out.add_line(f"DEBUG: ({min_dmg}-{max_dmg} dmg)")
@@ -213,9 +210,12 @@ class Game:
         elif ui in ["shoot", "s"]:
             bullet_qty = self.player.inventory.get_item_qty("Bullet")
             if bullet_qty:
-                self.gui.main_out.add_line(
-                    f"You decide to use one of your {bullet_qty} bullets."
-                )
+                if bullet_qty > 1:
+                    self.gui.main_out.add_line(
+                        f"You decide to use one of your {bullet_qty} bullets."
+                    )
+                else:
+                    self.gui.main_out.add_line("You decide to use your last bullet.")
                 self.player.inventory.remove("Bullet")
                 self.shoot_attack_hostiles()
             else:
@@ -265,13 +265,12 @@ class Game:
         act_dmg = random.randint(min_dmg, max_dmg)
         dmg_flavor = color_string(
             self.get_dmg_flavor(act_dmg, min_dmg, base_dmg, max_dmg).lower(),
-            "bright_black",
+            "dim",
         )
-        enemy_text = color_string(f"{hostile.name}", COLOR_SCHEME["hostile_name"])
         self.gui.main_out.add_line(
-            f"The {enemy_text} attacks you, scoring {dmg_flavor}"
+            f"The {hostile.name_str} attacks you, scoring {dmg_flavor}"
         )
-        # dmg_txt = color_string(f"{act_dmg} damage", COLOR_SCHEME['damage'])
+        # dmg_txt = color_string(f"{act_dmg} damage", 'damage')
         # self.gui.main_out.add_line(
         #     f"It connects for ({min_dmg}-{max_dmg}) {dmg_txt}!",
         # )
@@ -311,7 +310,7 @@ class Game:
         self.current_tile.chests.remove(self.player.coordinates)
         item_in_chest, qty_in_chest = self.get_chest_contents()
         if item_in_chest == "money":
-            inside_txt = color_string(f"${qty_in_chest}", COLOR_SCHEME["got_item"])
+            inside_txt = color_string(f"${qty_in_chest}", "got_item")
             self.gui.main_out.add_line(
                 f"You open a chest - there is {inside_txt} inside!"
             )
@@ -323,7 +322,7 @@ class Game:
         it_or_them = "it" if qty_in_chest == 1 else "them"
         are_or_is = "is" if qty_in_chest == 1 else "are"
         full_item_desc = color_string(
-            f"{qty_in_chest} {item_in_chest}{plural}", COLOR_SCHEME["got_item"]
+            f"{qty_in_chest} {item_in_chest}{plural}", "got_item"
         )
         self.gui.main_out.add_line(
             f"You open a chest - there {are_or_is} {full_item_desc} inside!"
@@ -369,7 +368,7 @@ class Game:
             if conversation_npcs:
                 convo_npc = random.choice(conversation_npcs)
                 self.gui.main_out.add_line(
-                    f"The friendly {convo_npc.name} in this room strikes up a conversation with you!"
+                    f"The friendly {convo_npc.name_str} in this room strikes up a conversation with you!"
                 )
                 self.enter_conversation(convo_npc)
 
@@ -380,7 +379,7 @@ class Game:
         if self.game_state == GameState.in_map:
             self.current_tile.room_flavor_text(self.player.coordinates)
             if self.player.coordinates in self.current_tile.chests:
-                open_txt = color_string("open", COLOR_SCHEME["main_command"])
+                open_txt = color_string("open", "main_command")
                 self.gui.main_out.add_line(
                     f"There's a chest in this room! {open_txt} it to see what's inside."
                 )
@@ -388,27 +387,28 @@ class Game:
                 if not ct_npc.is_dead and ct_npc.coordinates == self.player.coordinates:
                     if ct_npc.will_attack_player():
                         self.gui.main_out.add_line(
-                            f"There is a hostile {ct_npc.name} in this room!"
+                            f"There is a hostile {ct_npc.name_str} in this room!"
                         )
                     else:
                         self.gui.main_out.add_line(
-                            f"There is a friendly {ct_npc.name} in this room!"
+                            f"There is a friendly {ct_npc.name_str} in this room!"
                         )
-            self.gui.main_out.add_line("What direction do you want to move? [n/e/s/w]")
+            self.gui.main_out.add_line(
+                "What direction do you want to move? "
+                + color_string("(n/e/s/w)", "dim")
+            )
         elif self.game_state == GameState.in_combat:
             for hostile in self.interaction.in_combat_vs:
-                enemy_text = color_string(
-                    f"{hostile.name.title()}", COLOR_SCHEME["hostile_name"]
-                )
+                enemy_text = color_string(f"{hostile.name.title()}", "hostile_name")
                 self.gui.main_out.add_line(
                     f"{enemy_text}: {hostile.hp}/{hostile.max_hp} HP",
                 )
             # self.gui.main_out.add_line(f"You: {self.player.hp}/{self.player.max_hp} HP")
             self.gui.main_out.add_line(
-                f"You can {color_string('melee', COLOR_SCHEME['main_command'])} attack, or attempt to {color_string('run', COLOR_SCHEME['secondary_command'])}.",
+                f"You can {color_string('melee', 'main_command')} attack, or attempt to {color_string('run', 'secondary_command')}.",
             )
             if self.player.inventory.get_item_qty("Bullet") > 0:
-                shoot_txt = color_string("shoot", COLOR_SCHEME["main_command"])
+                shoot_txt = color_string("shoot", "main_command")
                 self.gui.main_out.add_line(
                     f"You can also try to {shoot_txt} an enemy ({self.player.gun_aiming}%)"
                 )
@@ -421,7 +421,7 @@ class Game:
                 "You exist in a state of limbo; a world between worlds."
             )
             self.gui.main_out.add_line(
-                f"You take a moment to reflect. Your current score is {self.player.score}"
+                f"You take a moment to reflect. Your current score is {color_string(self.player.score, )}"
             )
             if self.player.humanity <= 90 and self.player.money >= 10:
                 self.gui.main_out.add_line(
@@ -471,15 +471,15 @@ class Game:
             self.gui.main_out.add_line(
                 color_string(
                     "The whispering gets louder and louder until it is suddenly silent.",
-                    COLOR_SCHEME["humanity_down"],
+                    "humanity_down",
                 )
             )
             self.gui.main_out.add_line(
                 color_string(
                     "You return to awareness feeling stronger! But also distinctly...",
-                    COLOR_SCHEME["good_thing_happened"],
+                    "good_thing_happened",
                 )
-                + color_string(" unclean", COLOR_SCHEME["humanity_down"])
+                + color_string(" unclean", "humanity_down")
             )
             self.player.flags.cursed_revive += 4
             self.player.attack_power += 1
@@ -499,7 +499,7 @@ class Game:
             player_move = self.player.move(self.current_tile, command)
             if player_move:  # move successful
                 self.gui.main_out.add_line(
-                    color_string(f"You move {player_move}.", "bright_black")
+                    color_string(f"You move {player_move}.", "dim")
                 )
                 if self.player.coordinates not in self.current_tile.explored:
                     # heal when entering new rooms
@@ -557,12 +557,12 @@ class Game:
                 for npc in friendly_npcs:
                     if npc.conversation.has_ended:
                         self.gui.main_out.add_line(
-                            f"The {npc.name} doesn't have anything more to say."
+                            f"The {npc.name_str} doesn't have anything more to say."
                         )
                         return
                     else:
                         self.gui.main_out.add_line(
-                            f"You strike up a conversation with the friendly {npc.name}."
+                            f"You strike up a conversation with the friendly {npc.name_str}."
                         )
                         self.enter_conversation(npc)
                         # return so that we don't check for combat and other conversations after this

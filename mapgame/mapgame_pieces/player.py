@@ -214,17 +214,17 @@ class Player(LivingThing):
                 setattr(self, entry, value)
 
     def grant_xp(self, xp: int):
-        xp_txt = color_string(f"{xp} XP!", COLOR_SCHEME["stat_up"])
+        xp_txt = color_string(f"{xp} XP!", "stat_up")
         self.gui.main_out.add_line(f"You gained {xp_txt}")
         self.xp += xp
         if self.xp > (25 * pow(self.level, 1.3)):
-            lvl_txt = color_string(f"You have leveled up!", COLOR_SCHEME["level_up"])
+            lvl_txt = color_string(f"You have leveled up!", "level_up")
             self.gui.main_out.add_line(lvl_txt)
             self.level += 1
             self.attack_power += 1
             self.max_hp += 5
             self.hp += 5
-            buffs_txt = color_string("(+1 ATK, +5 Max HP)", COLOR_SCHEME["stat_up"])
+            buffs_txt = color_string("(+1 ATK, +5 Max HP)", "stat_up")
             self.gui.main_out.add_line(f"You are now level {self.level}. {buffs_txt}")
 
             # heal up to ~15% health
@@ -234,7 +234,7 @@ class Player(LivingThing):
             self.humanity += 1
 
     def grant_money(self, money: int):
-        money_txt = color_string(f"${money}!", COLOR_SCHEME["got_item"])
+        money_txt = color_string(f"${money}!", "got_item")
         self.gui.main_out.add_line(f"You gained {money_txt}")
         self.money += money
 
@@ -288,7 +288,7 @@ class Player(LivingThing):
         else:
             malicious_power_txt = color_string(
                 "Suddenly a feeling of malicious power overwhelms you!",
-                COLOR_SCHEME["humanity_down"],
+                "humanity_down",
             )
             self.gui.main_out.add_line(
                 malicious_power_txt + " You feel refreshed, but at what cost?"
@@ -298,10 +298,10 @@ class Player(LivingThing):
     def take_damage(self, dmg: int) -> bool:
         """return True if you died"""
         ouch = random.choice(["Ouch", "Oof", "Owwie", "Yikes", "Oh no"])
-        dmg_txt = color_string(f"You take {dmg} damage!", COLOR_SCHEME["damage_taken"])
+        dmg_txt = color_string(f"You take {dmg} damage!", "damage_taken")
         self.gui.main_out.add_line(f"{ouch}! {dmg_txt}")
         self.hp -= dmg
-        if self.hp >= 0:
+        if self.hp > 0:
             return False
         self.hp = (
             0  # maybe rm this? the idea of overkill affecting your next hp pool is cool
@@ -315,7 +315,7 @@ class Player(LivingThing):
         hp_missing = self.max_hp - self.hp
         if hp_missing < rec:
             rec = hp_missing
-        hp_txt = color_string(str(rec) + " HP", "green")
+        hp_txt = color_string(str(rec) + " HP", "recover_hp")
         self.gui.main_out.add_line(f"You recover {hp_txt}!")
         self.hp += rec
 

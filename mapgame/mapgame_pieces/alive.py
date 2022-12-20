@@ -1,6 +1,7 @@
 import random
 import logging
 from mapgame_pieces.conversations import Conversation, NoConversation
+from mapgame_pieces.utils import color_string
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +69,14 @@ class NPC(LivingThing):
         self.wander = True
         self.is_dead = False
         self.conversation: Conversation | None = None
+
+    @property
+    def name_str(self):
+        if self.player_attitude > 0:
+            color = "friendly_name"
+        else:
+            color = "hostile_name"
+        return color_string(self.name, color)
 
     @classmethod
     def generate_from_level(cls, level: int) -> "NPC":

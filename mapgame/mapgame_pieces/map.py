@@ -138,19 +138,19 @@ class Tile:
             room_name = self.rooms[room_coords].name
             self.gui.main_out.add_line(f"You stand in the {room_name} room!")
             if room_name == "portal":
-                leave_txt = color_string(f"leave", COLOR_SCHEME["main_command"])
+                leave_txt = color_string(f"leave", "main_command")
                 self.gui.main_out.add_line(
                     f"You can {leave_txt} through the portal in this room.",
                 )
                 # TODO: cleared?
             elif room_name == "medbay":
                 self.gui.main_out.add_line(
-                    f"You can {color_string('heal', COLOR_SCHEME['main_command'])} in the medbay here.",
+                    f"You can {color_string('heal', 'main_command')} in the medbay here.",
                 )
         except KeyError:
             # empty room
             self.gui.main_out.add_line(
-                color_string("You stand in an empty room.", "bright_black")
+                color_string("You stand in an empty room.", "dim")
             )
 
     def generate_paths(self, n_paths: int):
