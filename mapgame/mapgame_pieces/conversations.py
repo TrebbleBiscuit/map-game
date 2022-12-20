@@ -3,6 +3,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 LEAVE_OPTIONS = ["leave", "exit", "l"]
+THANKS = ["thanks", "thank", "thank you", "ty", "cheers"]
 
 
 class Conversation:

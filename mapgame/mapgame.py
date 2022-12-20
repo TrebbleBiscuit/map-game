@@ -6,13 +6,18 @@ from dataclasses import dataclass, field
 from mapgame_pieces.player import Player
 from mapgame_pieces.alive import NPC
 from mapgame_pieces.map import Map
-from mapgame_pieces.utils import color_string, sanitize_input, get_plural_suffix
+from mapgame_pieces.utils import (
+    color_string,
+    sanitize_input,
+    get_plural_suffix,
+    COLOR_SCHEME,
+)
 from mapgame_pieces.gui import GUIWrapper
 from mapgame_pieces.items import Item
 
 logger = logging.getLogger(__name__)
 
-INVALID_INPUT_MSG = color_string("Input not understood", "Style.DIM")
+INVALID_INPUT_MSG = color_string("Input not understood", "bright_black")
 MAP_WIDTH = 8
 MAP_HEIGHT = 4
 
@@ -118,10 +123,14 @@ class Game:
         self.interaction.in_combat_vs = hostiles
         self.game_state = GameState.in_combat
         if len(hostiles) == 1:
-            enemy_text = color_string(f"{hostiles[0].name}", "Fore.RED")
+            enemy_text = color_string(
+                f"{hostiles[0].name}", COLOR_SCHEME["hostile_name"]
+            )
             self.gui.main_out.add_line(f"\nEntered combat with a hostile {enemy_text}!")
         else:
-            enemy_text = color_string(", ".join(h.name for h in hostiles), "Fore.RED")
+            enemy_text = color_string(
+                ", ".join(h.name for h in hostiles), COLOR_SCHEME["hostile_name"]
+            )
             self.gui.main_out.add_line(f"\nEntered combat with hostiles: {enemy_text}!")
 
     def end_combat(self):
@@ -139,17 +148,22 @@ class Game:
         min_dmg = int((base_dmg * 0.5) + 0.5)
         max_dmg = int(base_dmg * 1.5)
         for hostile in self.interaction.in_combat_vs:
-            enemy_text = color_string(f"{hostile.name}", "Fore.RED")
+            enemy_text = color_string(f"{hostile.name}", COLOR_SCHEME["hostile_name"])
             act_dmg = random.randint(min_dmg, max_dmg)
             self.gui.main_out.add_line(f"You take a swing at the {enemy_text}!")
-            dmg_txt = color_string(f"{act_dmg} damage", "Fore.RED")
-            dmg_flavor = self.get_dmg_flavor(act_dmg, min_dmg, base_dmg, max_dmg)
-            self.gui.main_out.add_line(f"You do [red]{dmg_txt}[/red]! {dmg_flavor}")
+            dmg_txt = color_string(f"{act_dmg} damage", COLOR_SCHEME["damage_done"])
+            dmg_flavor = color_string(
+                self.get_dmg_flavor(act_dmg, min_dmg, base_dmg, max_dmg), "bright_black"
+            )
+            self.gui.main_out.add_line(f"You do {dmg_txt}! {dmg_flavor}")
             if self.debug:
                 self.gui.main_out.add_line(f"DEBUG: ({min_dmg}-{max_dmg} dmg)")
             if hostile.take_damage(act_dmg):
                 self.gui.main_out.add_line(
-                    f"It falls to the ground and disappears in a flash of light!"
+                    color_string(
+                        f"It falls to the ground and disappears in a flash of light!",
+                        COLOR_SCHEME["good_thing_happened"],
+                    )
                 )
                 self.player.humanity += 1
 
@@ -174,11 +188,13 @@ class Game:
         act_dmg = random.randint(min_dmg, max_dmg)
         hit = random.randint(0, 100) <= self.player.gun_aiming
         hostile = random.choice(self.interaction.in_combat_vs)
-        enemy_text = color_string(f"{hostile.name}", "Fore.RED")
+        enemy_text = color_string(f"{hostile.name}", COLOR_SCHEME["hostile_name"])
         self.gui.main_out.add_line(f"You aim at the {enemy_text} and pull the trigger!")
         if hit:
-            dmg_flavor = self.get_dmg_flavor(act_dmg, min_dmg, base_dmg, max_dmg)
-            dmg_txt = color_string(f"{act_dmg} damage", "Fore.RED")
+            dmg_flavor = color_string(
+                self.get_dmg_flavor(act_dmg, min_dmg, base_dmg, max_dmg), "bright_black"
+            )
+            dmg_txt = color_string(f"{act_dmg} damage", COLOR_SCHEME["damage_done"])
             self.gui.main_out.add_line(f"You do {dmg_txt}! {dmg_flavor}")
             if self.debug:
                 self.gui.main_out.add_line(f"DEBUG: ({min_dmg}-{max_dmg} dmg)")
@@ -212,7 +228,7 @@ class Game:
                 self.end_combat()
                 return
             self.gui.main_out.add_line(
-                f"You try to run away ({success_chance}%), but aren't quick enough this time!"
+                f"You try to run away ({int(success_chance*100)}%), but aren't quick enough this time!"
             )
         else:
             self.gui.main_out.add_line(INVALID_INPUT_MSG)
@@ -247,12 +263,15 @@ class Game:
         min_dmg = int((base_dmg * 0.7) + 0.5)
         max_dmg = int(base_dmg * 1.3)
         act_dmg = random.randint(min_dmg, max_dmg)
-        dmg_flavor = self.get_dmg_flavor(act_dmg, min_dmg, base_dmg, max_dmg)
-        enemy_text = color_string(f"{hostile.name}", "Fore.RED")
-        self.gui.main_out.add_line(
-            f"The {enemy_text} attacks you, scoring {dmg_flavor.lower()}"
+        dmg_flavor = color_string(
+            self.get_dmg_flavor(act_dmg, min_dmg, base_dmg, max_dmg).lower(),
+            "bright_black",
         )
-        # dmg_txt = color_string(f"{act_dmg} damage", "Fore.RED")
+        enemy_text = color_string(f"{hostile.name}", COLOR_SCHEME["hostile_name"])
+        self.gui.main_out.add_line(
+            f"The {enemy_text} attacks you, scoring {dmg_flavor}"
+        )
+        # dmg_txt = color_string(f"{act_dmg} damage", COLOR_SCHEME['damage'])
         # self.gui.main_out.add_line(
         #     f"It connects for ({min_dmg}-{max_dmg}) {dmg_txt}!",
         # )
@@ -292,8 +311,9 @@ class Game:
         self.current_tile.chests.remove(self.player.coordinates)
         item_in_chest, qty_in_chest = self.get_chest_contents()
         if item_in_chest == "money":
+            inside_txt = color_string(f"${qty_in_chest}", COLOR_SCHEME["got_item"])
             self.gui.main_out.add_line(
-                f"You open a chest - there is ${qty_in_chest} inside!"
+                f"You open a chest - there is {inside_txt} inside!"
             )
             self.player.money += qty_in_chest
             return
@@ -302,8 +322,11 @@ class Game:
         plural = get_plural_suffix(item_in_chest) if qty_in_chest > 1 else ""
         it_or_them = "it" if qty_in_chest == 1 else "them"
         are_or_is = "is" if qty_in_chest == 1 else "are"
+        full_item_desc = color_string(
+            f"{qty_in_chest} {item_in_chest}{plural}", COLOR_SCHEME["got_item"]
+        )
         self.gui.main_out.add_line(
-            f"You open a chest - there {are_or_is} {qty_in_chest} {item_in_chest}{plural} inside!"
+            f"You open a chest - there {are_or_is} {full_item_desc} inside!"
         )
         self.gui.main_out.add_line(f"You add {it_or_them} to your inventory.")
         logger.debug(f"player inventory contents: {self.player.inventory.contents}")
@@ -357,8 +380,9 @@ class Game:
         if self.game_state == GameState.in_map:
             self.current_tile.room_flavor_text(self.player.coordinates)
             if self.player.coordinates in self.current_tile.chests:
+                open_txt = color_string("open", COLOR_SCHEME["main_command"])
                 self.gui.main_out.add_line(
-                    "There's a chest in this room! 'open' it to see what's inside."
+                    f"There's a chest in this room! {open_txt} it to see what's inside."
                 )
             for ct_npc in self.current_tile.npcs:
                 if not ct_npc.is_dead and ct_npc.coordinates == self.player.coordinates:
@@ -373,17 +397,20 @@ class Game:
             self.gui.main_out.add_line("What direction do you want to move? [n/e/s/w]")
         elif self.game_state == GameState.in_combat:
             for hostile in self.interaction.in_combat_vs:
-                enemy_text = color_string(f"{hostile.name}", "Fore.RED")
+                enemy_text = color_string(
+                    f"{hostile.name.title()}", COLOR_SCHEME["hostile_name"]
+                )
                 self.gui.main_out.add_line(
-                    f"{enemy_text.title()}: {hostile.hp}/{hostile.max_hp} HP",
+                    f"{enemy_text}: {hostile.hp}/{hostile.max_hp} HP",
                 )
             # self.gui.main_out.add_line(f"You: {self.player.hp}/{self.player.max_hp} HP")
             self.gui.main_out.add_line(
-                f"You can {color_string('melee', 'Fore.RED')} attack, or attempt to {color_string('run', 'Fore.CYAN')}.",
+                f"You can {color_string('melee', COLOR_SCHEME['main_command'])} attack, or attempt to {color_string('run', COLOR_SCHEME['secondary_command'])}.",
             )
             if self.player.inventory.get_item_qty("Bullet") > 0:
+                shoot_txt = color_string("shoot", COLOR_SCHEME["main_command"])
                 self.gui.main_out.add_line(
-                    f"You can also try to shoot an enemy ({self.player.gun_aiming}%)"
+                    f"You can also try to {shoot_txt} an enemy ({self.player.gun_aiming}%)"
                 )
         elif self.game_state == GameState.in_conversation:
             assert self.interaction.in_conversation_with
@@ -398,10 +425,14 @@ class Game:
             )
             if self.player.humanity <= 90 and self.player.money >= 10:
                 self.gui.main_out.add_line(
-                    "You can pay tithe to regain humanity (2c/h)"
+                    "You can pay tithe to regain humanity (8c/h)"
                 )
-            if self.player.humanity <= 80 and self.player.humanity >= 20:
-                self.gui.main_out.add_line("You could pray to the dark gods")
+            if (
+                self.player.flags.humanity_warning_level
+                and self.player.humanity > 20
+                and not self.player.flags.cursed_revive
+            ):
+                self.gui.main_out.add_line("You could pray to the dark gods...")
             self.gui.main_out.add_line("You can continue onward to exit limbo")
         else:
             raise ValueError(f"Invalid Game State '{self.game_state}'")
@@ -417,15 +448,41 @@ class Game:
             and self.player.humanity < 80
             and self.player.money >= 10
         ):
-            cost_per = 2
+            cost_per = 8
             max_cost = (100 - self.player.humanity) * cost_per
             pay = min(self.player.money, max_cost)
+            remainder = pay % 8
+            pay -= remainder
             regain = pay // cost_per
             self.gui.main_out.add_line(
                 f"You exchange {pay} money for {regain} humanity!"
             )
             self.player.money -= pay
             self.player.humanity += regain
+        elif (
+            command in ["pray"]
+            and self.player.flags.humanity_warning_level
+            and self.player.humanity > 20
+            and self.player.flags.cursed_revive
+        ):
+            self.gui.main_out.add_line(
+                "Shaking off the feeling that this is a bad idea, you give in to the whispers in your head..."
+            )
+            self.gui.main_out.add_line(
+                color_string(
+                    "The whispering gets louder and louder until it is suddenly silent.",
+                    COLOR_SCHEME["humanity_down"],
+                )
+            )
+            self.gui.main_out.add_line(
+                color_string(
+                    "You return to awareness feeling stronger! But also distinctly...",
+                    COLOR_SCHEME["good_thing_happened"],
+                )
+                + color_string(" unclean", COLOR_SCHEME["humanity_down"])
+            )
+            self.player.flags.cursed_revive += 4
+            self.player.attack_power += 1
 
     def get_current_room_name(self) -> str | None:
         """Return the name of the room the player is currently in"""
@@ -441,7 +498,9 @@ class Game:
         elif command in ["n", "e", "s", "w"]:
             player_move = self.player.move(self.current_tile, command)
             if player_move:  # move successful
-                self.gui.main_out.add_line(f"You move {player_move}.")
+                self.gui.main_out.add_line(
+                    color_string(f"You move {player_move}.", "bright_black")
+                )
                 if self.player.coordinates not in self.current_tile.explored:
                     # heal when entering new rooms
                     self.player._heal_over_time()

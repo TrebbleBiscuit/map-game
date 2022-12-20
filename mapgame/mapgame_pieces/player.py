@@ -1,6 +1,6 @@
 import random
 from mapgame_pieces.alive import LivingThing
-from mapgame_pieces.utils import color_string
+from mapgame_pieces.utils import color_string, COLOR_SCHEME
 from mapgame_pieces.items import Item
 import logging
 from dataclasses import dataclass
@@ -91,6 +91,7 @@ class Flags:
     def __init__(self, saved: dict | None = None):
         self.humanity_warning_level = 0
         self.blessed_revive = 0
+        self.cursed_revive = 0
 
         if saved:
             self.from_saved(saved)
@@ -150,8 +151,8 @@ class Player(LivingThing):
             warn_msg = "It is getting harder to ignore the whispers. To fight away the sense of hopeless despair..."
             self.gui.main_out.add_line(warn_msg)
         elif val < 20 and warn_lvl == 3:
-            self.flags_humanity_warning_level = 4
-            warn_msg = "There is less and less human about you all the time, but you're still in control of yourself for now..."
+            self.flags.humanity_warning_level = 4
+            warn_msg = "There is less and less human about you all the time... How much longer can you remain in control?"
             self.gui.main_out.add_line(warn_msg)
             self.gui.main_out.add_line("Right?")
 
@@ -194,7 +195,12 @@ class Player(LivingThing):
     def load_from_file(self):
         logger.debug("Loading save from %s", SAVE_PATH)
         with open(SAVE_PATH) as savefile:
-            save_data = json.load(savefile)
+            try:
+                save_data = json.load(savefile)
+            except json.decoder.JSONDecodeError as exc:
+                logger.error("Error decoding savefile; starting new game")
+                logger.exception(exc)
+                return
         for entry, value in save_data.items():
             if entry == "inventory_contents":
                 self.inventory = Inventory(contents=value)
@@ -202,23 +208,24 @@ class Player(LivingThing):
                 self.abilities = Abilities(saved=value)
             elif entry == "flags":
                 self.flags = Flags(saved=value)
+            elif entry == "humanity":
+                self._humanity = value
             else:
                 setattr(self, entry, value)
 
     def grant_xp(self, xp: int):
-        self.gui.main_out.add_line(f"You gained {xp} XP!")
+        xp_txt = color_string(f"{xp} XP!", COLOR_SCHEME["stat_up"])
+        self.gui.main_out.add_line(f"You gained {xp_txt}")
         self.xp += xp
         if self.xp > (25 * pow(self.level, 1.3)):
-            # lvl_txt = color_string(f"You have leveled up!", Fore.GREEN)
-            lvl_txt = "[bold green]You have leveled up![/bold green]"
+            lvl_txt = color_string(f"You have leveled up!", COLOR_SCHEME["level_up"])
             self.gui.main_out.add_line(lvl_txt)
             self.level += 1
             self.attack_power += 1
             self.max_hp += 5
             self.hp += 5
-            self.gui.main_out.add_line(
-                f"You are now level {self.level}. (+1 ATK, +5 Max HP)"
-            )
+            buffs_txt = color_string("(+1 ATK, +5 Max HP)", COLOR_SCHEME["stat_up"])
+            self.gui.main_out.add_line(f"You are now level {self.level}. {buffs_txt}")
 
             # heal up to ~15% health
             self.heal_up_to(int(self.max_hp / 6))
@@ -227,7 +234,8 @@ class Player(LivingThing):
             self.humanity += 1
 
     def grant_money(self, money: int):
-        self.gui.main_out.add_line(f"You gained {money} money!")
+        money_txt = color_string(f"${money}!", COLOR_SCHEME["got_item"])
+        self.gui.main_out.add_line(f"You gained {money_txt}")
         self.money += money
 
     def game_over(self):
@@ -237,6 +245,7 @@ class Player(LivingThing):
             "No longer will you rise to fight the endless hoard of monsters."
         )
         self.gui.main_out.add_line("Instead you are doomed to wander among them.")
+        self.gui.main_out.add_line("    GAME OVER    ")
         self.gui.main_out.add_line(f"Your final score is {self.score}")
         self.gui.main_out.add_line(
             "delete your save file if you want, or just keep playing"
@@ -246,6 +255,9 @@ class Player(LivingThing):
         if not blessed and self.flags.blessed_revive:
             self.flags.blessed_revive -= 1
             blessed = True
+        elif not cursed and self.flags.cursed_revive:
+            self.flags.cursed_revive -= 1
+            cursed = True
         if blessed:
             humanity_loss = 0
             recover_ratio = 1
@@ -274,15 +286,20 @@ class Player(LivingThing):
                 "When you come to, there is nothing left of the hostiles but mutilated corpses. Was this your doing..?"
             )
         else:
+            malicious_power_txt = color_string(
+                "Suddenly a feeling of malicious power overwhelms you!",
+                COLOR_SCHEME["humanity_down"],
+            )
             self.gui.main_out.add_line(
-                "Suddenly a feeling of malicious power overwhelms you! You feel refreshed, but at what cost?"
+                malicious_power_txt + " You feel refreshed, but at what cost?"
             )
         self.recover_hp(int(self.max_hp * recover_ratio))
 
     def take_damage(self, dmg: int) -> bool:
         """return True if you died"""
         ouch = random.choice(["Ouch", "Oof", "Owwie", "Yikes", "Oh no"])
-        self.gui.main_out.add_line(f"{ouch}! You take {dmg} damage!")
+        dmg_txt = color_string(f"You take {dmg} damage!", COLOR_SCHEME["damage_taken"])
+        self.gui.main_out.add_line(f"{ouch}! {dmg_txt}")
         self.hp -= dmg
         if self.hp >= 0:
             return False
@@ -298,8 +315,8 @@ class Player(LivingThing):
         hp_missing = self.max_hp - self.hp
         if hp_missing < rec:
             rec = hp_missing
-        hp_txt = color_string(str(rec), "Fore.GREEN")
-        self.gui.main_out.add_line(f"You recover {hp_txt} HP!")
+        hp_txt = color_string(str(rec) + " HP", "green")
+        self.gui.main_out.add_line(f"You recover {hp_txt}!")
         self.hp += rec
 
     def heal_up_to(self, up_to: int):

@@ -1,6 +1,7 @@
 from rich import markup
 from textual.app import App, ComposeResult
 from textual.widgets import Header, Static, Input, TextLog
+from rich.text import Text
 
 
 def make_15_chars_long(string: str) -> str:
@@ -12,7 +13,7 @@ def make_15_chars_long(string: str) -> str:
 
 class OutputWindow(TextLog):
     def add_line(self, new_content: str):
-        self.write(new_content)
+        self.write(Text.from_markup(new_content))
 
 
 class GUIWrapper(App):
@@ -22,7 +23,9 @@ class GUIWrapper(App):
     def __init__(self, game):
         super().__init__()
         self.stats_out = Static("Stats", classes="box")
-        self.main_out = OutputWindow(wrap=True, classes="box", id="tallboi")
+        self.main_out = OutputWindow(
+            wrap=True, markup=True, classes="box", id="tallboi"
+        )
         self.map_out = Static("Map", classes="box")
         self.default_input_placeholder = "Type a command and press enter"
         self.main_in = Input(
