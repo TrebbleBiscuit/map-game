@@ -1,6 +1,7 @@
 import random
 import logging
 from mapgame_pieces.conversations import Conversation, NoConversation
+from mapgame_pieces.utils import color_string
 
 logger = logging.getLogger(__name__)
 
@@ -69,15 +70,42 @@ class NPC(LivingThing):
         self.is_dead = False
         self.conversation: Conversation | None = None
 
+    @property
+    def name_str(self):
+        if self.player_attitude > 0:
+            color = "friendly_name"
+        else:
+            color = "hostile_name"
+        return color_string(self.name, color)
+
     @classmethod
     def generate_from_level(cls, level: int) -> "NPC":
-        if random.random() < 0.2:
-            level += 1
-        adjs = ["spooky", "scary", "threatening", "menacing", "dangerous"]
-        nouns = ["slime", "skeleton", "bad guy", "zombie", "mugger"]
+        adjs = [
+            "spooky",
+            "scary",
+            "threatening",
+            "menacing",
+            "dangerous",
+            "fearsome",
+            "angry",
+            "intimidating",
+        ]
+        nouns = [
+            "slime",
+            "skeleton",
+            "bad guy",
+            "zombie",
+            "mugger",
+            "scoundrel",
+            "villain",
+            "miscreant",
+        ]
         name = random.choice(adjs) + " " + random.choice(nouns)
         logger.info(f"Generating level {level} enemy {name}")
         inst = cls(name)
+        inst.tile_index = level
+        if random.random() < 0.2:
+            level += 1
         hp_base = random.randint(15, 20)
         hp_level_multi = random.uniform(4.5, 5.5)
         inst.max_hp = hp_base + int(level * hp_level_multi)
@@ -88,7 +116,7 @@ class NPC(LivingThing):
         inst.attack_power = level + attack_modifier
         inst.xp_reward = inst.attack_power + int(inst.max_hp / 7)
         # inst.attack_type = random.choice(['ranged', 'melee'])
-        inst.tile_index = level
+
         return inst
 
     def will_attack_player(self) -> bool:
@@ -117,7 +145,6 @@ class NPC(LivingThing):
                         f"NPC at {(self.x, self.y)} could not find a location to wander to!"
                     )
                     return False
-            logger.debug(f"{self.name} moved {mv_choice} to {(self.x, self.y)}")
 
     def take_damage(self, dmg: int) -> bool:
         """deal `dmg` damage. return True if hostile is dead"""

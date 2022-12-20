@@ -10,9 +10,32 @@ def get_plural_suffix(word: str):
     return "s"
 
 
+COLOR_SCHEME = {
+    "main_command": "deep_sky_blue1",
+    "secondary_command": "deep_sky_blue3",
+    "hostile_name": "medium_orchid",
+    "friendly_name": "bold white",
+    "damage_done": "dark_red",
+    "damage_taken": "bright_red",
+    "got_item": "bright_cyan",
+    "humanity_down": "deep_pink3",
+    "level_up": "bold green1",
+    "stat_up": "gold1",
+    "good_thing_happened": "gold3",
+    "dim": "bright_black",
+    "recover_hp": "green",
+    "dialogue": "light_sky_blue1"
+}
+
+
 def color_string(string, color):
-    """NOT IMPLEMENTED - Return a string that's been colored"""
-    return string
+    """Return a string with color tags"""
+    try:
+        tag = COLOR_SCHEME[color]
+    except KeyError:
+        logger.info("Using color tag: %s", color)
+        tag = color
+    return f"[{tag}]{string}[/{tag}]"
 
 
 def sanitize_input(in_str: str) -> str:

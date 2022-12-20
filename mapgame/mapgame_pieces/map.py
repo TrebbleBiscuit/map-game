@@ -9,8 +9,9 @@ from mapgame_pieces.conversations import (
     RiddleConvo,
     IntroConvo,
     WisdomConvo,
-    NoConversation,
+    BuffConvo,
 )
+from mapgame_pieces.utils import color_string, COLOR_SCHEME
 
 logger = logging.getLogger(__name__)
 BASE_NPCS_PER_TILE = 7
@@ -24,7 +25,8 @@ class Room:
     map_icon: str
 
 
-RoomMap = dict[tuple[int, int], Room]
+Coordinates = tuple[int, int]
+RoomMap = dict[Coordinates, Room]
 
 
 class Tile:
@@ -46,7 +48,7 @@ class Tile:
         #     },  # default for now
         # }
         self.spawn_chests()
-        self.explored: set[tuple[int, int]] = set(
+        self.explored: set(Coordinates) = set(
             [(0, 0)]
         )  # had to put the tuple in a list to get it to turn into a set of tuples
         self.paths = self.generate_paths(self.width * self.height)
@@ -61,20 +63,21 @@ class Tile:
             npc.x, npc.y = self.gen_random_coordinates()
             logger.debug(f"NPC spawned at {(npc.x, npc.y)}")
 
-    def make_conversation(self):
+    def make_conversation(self, npc):
 
         all_conversations = [
             RiddleConvo(
-                self,
+                npc,
                 riddle_text="What has four paws and rhymes with 'rat'?",
                 correct_answers=("cat", "rat"),
             ),
-            IntroConvo(self),
-            WisdomConvo(self),
-            WisdomConvo(
-                self,
-                f"There are {len(self.chests)} unopened chests and {len(self.npcs) + 1} living creatures on this floor.",
-            ),
+            IntroConvo(npc),
+            WisdomConvo(npc),
+            # WisdomConvo(
+            #     npc,
+            #     f"Before you arrived, there were {len(self.npcs)} living beings on this floor.",
+            # ),
+            BuffConvo(npc),
         ]
 
         return random.choice(all_conversations)
@@ -85,13 +88,15 @@ class Tile:
         f_npc = NPC.generate_from_level(level + 2)
         f_npc.player_attitude = 1
         f_npc.x, f_npc.y = self.gen_random_coordinates()
-        convo = self.make_conversation()
+        # if level == 1:
+        #     convo = IntroConvo(npc=f_npc)
+        convo = self.make_conversation(npc=f_npc)
         if isinstance(convo, WisdomConvo):
             adj = "wise"
         elif isinstance(convo, IntroConvo):
             adj = "helpful"
         f_npc.name = adj + " " + noun
-        f_npc.conversation = self.make_conversation()
+        f_npc.conversation = convo
         self.npcs.append(f_npc)
 
     def _starting_rooms(self) -> RoomMap:
@@ -108,7 +113,7 @@ class Tile:
         cx, cy = self.gen_random_coordinates()
         self.rooms[(cx, cy)] = Room(x=cx, y=cy, name=room_name, map_icon=map_icon)
 
-    def gen_random_coordinates(self) -> tuple[int, int]:
+    def gen_random_coordinates(self) -> Coordinates:
         """Does not select coordinates with existing rooms or chests"""
         while True:
             x, y = random.randint(0, self.width - 1), random.randint(0, self.height - 1)
@@ -133,20 +138,20 @@ class Tile:
             room_name = self.rooms[room_coords].name
             self.gui.main_out.add_line(f"You stand in the {room_name} room!")
             if room_name == "portal":
-                # leave_txt = Utils.color_string(f"leave", Fore.MAGENTA)
-                leave_txt = "leave"
-                # portal_txt = Utils.color_string(f"leave", Style.BRIGHT)
+                leave_txt = color_string(f"leave", "main_command")
                 self.gui.main_out.add_line(
                     f"You can {leave_txt} through the portal in this room.",
                 )
                 # TODO: cleared?
             elif room_name == "medbay":
                 self.gui.main_out.add_line(
-                    f"You can 'heal' in the medbay here.",
+                    f"You can {color_string('heal', 'main_command')} in the medbay here.",
                 )
         except KeyError:
             # empty room
-            self.gui.main_out.add_line(f"You stand in an empty room.")
+            self.gui.main_out.add_line(
+                color_string("You stand in an empty room.", "dim")
+            )
 
     def generate_paths(self, n_paths: int):
         paths = []
@@ -281,7 +286,7 @@ class Tile:
         return self._path_when_moving(x, y, direction) in self.paths
 
     def get_map(self, player_x, player_y):
-        mapstr: str = f"You're at {player_x},{player_y}\n\n"
+        mapstr: str = ""
         for y in range(0, self.height):
             # print the yth row of rooms
             for x in range(0, self.width):

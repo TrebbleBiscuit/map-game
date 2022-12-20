@@ -1,6 +1,10 @@
 import random
+import logging
+from mapgame_pieces.utils import color_string
 
-LEAVE_OPTIONS = ["leave", "exit"]
+logger = logging.getLogger(__name__)
+LEAVE_OPTIONS = ["leave", "exit", "l"]
+THANKS = ["thanks", "thank", "thank you", "ty", "cheers"]
 
 
 class Conversation:
@@ -21,7 +25,7 @@ class Conversation:
 
     def wrap_in_quotes(self, quote: str) -> str:
         """Wrap in quotes and print to main_out"""
-        return f'"{quote}"'
+        return color_string(f'"{quote}"', "dialogue")
 
     def respond(self, player: "Player", to_say: str) -> str:
         ...
@@ -38,6 +42,7 @@ class WisdomConvo(Conversation):
         super().__init__(npc)
         self.given_wisdom = 0
         self.custom_wisdom = custom_wisdom
+        self.can_leave = False
 
     def prompt(self) -> str:
         if self.given_wisdom == 0:
@@ -49,9 +54,14 @@ class WisdomConvo(Conversation):
 
     def respond(self, player: "Player", to_say: str) -> str:
         if to_say in LEAVE_OPTIONS or self.given_wisdom:
-            self.exit_conversation()
-            return self.wrap_in_quotes("Good luck on your journey.")
+            if self.exit_conversation():
+                return self.wrap_in_quotes("Good luck on your journey.")
+            else:
+                return self.wrap_in_quotes("Wait, let me bestow my wisdom first!")
+
         self.given_wisdom += 1
+        self.can_leave = True
+        self.exit_conversation()
 
         if self.custom_wisdom:
             return self.wrap_in_quotes(self.custom_wisdom)
@@ -64,22 +74,86 @@ class WisdomConvo(Conversation):
         if not player.abilities.reduced_humanity_loss:
             possible_wisdom.append("reduced_humanity_loss")
 
-        out_msg = f"The {self.npc.name}'s wisdom "
-        match self.this_wisdom:
+        msg_1 = f"The {self.npc.name_str}'s wisdom "
+        match random.choice(possible_wisdom):
             case "xp":
                 player.grant_xp(player.level * 4 + 10)
-                return out_msg + "gives you a sense of experience!"
+                msg_2 = "gives you a sense of experience!"
             case "humanity":
                 player.humanity += 15
-                return out_msg + "makes you feel more clearheaded!"
+                msg_2 = "makes you feel more clearheaded!"
             case "passive_heal_double":
                 player.grant_ability("passive_heal_double")
-                return out_msg + "teaches you to passively heal twice as fast!! Wow!"
+                msg_2 = "teaches you to passively heal twice as fast!! Wow!"
             case "reduced_humanity_loss":
                 player.grant_ability("reduced_humanity_loss")
-                return out_msg + "teaches you to reduce your humanity losses!! Wow!"
+                msg_2 = "teaches you to reduce your humanity losses!! Wow!"
             case _ as another:
-                return f"{another} shouldnt be here rip"
+                logger.error(
+                    f"{self.npc.name_str} attempted to bestow the following unhandled wisdom type: {another}"
+                )
+                return f"{another} shouldnt be in possible wisdom rip PLS REPORT THIS"
+        return msg_1 + color_string(msg_2, "good_thing_happened")
+
+
+class BuffConvo(Conversation):
+    def __init__(self, npc):
+        super().__init__(npc)
+        self.given_buff = 0
+
+    def prompt(self) -> str:
+        if self.given_buff == 0:
+            return self.wrap_in_quotes(
+                "Hello, traveler! You look like you could use a hand."
+            )
+        else:
+            return self.wrap_in_quotes("That should help you out. Good luck out there.")
+
+    def respond(self, player: "Player", to_say: str) -> str:
+        if to_say in LEAVE_OPTIONS or self.given_buff:
+            if self.exit_conversation():
+                if to_say in THANKS:
+                    bye = "Happy to be of service! Be safe!"
+                else:
+                    bye = "Be safe!"
+                return self.wrap_in_quotes(bye)
+            else:
+                return self.wrap_in_quotes(
+                    "Wait, don't leave just yet! I've got something for you."
+                )
+
+        self.given_buff += 1
+        self.can_leave = True
+
+        possible_buffs = ["bless_res"]
+        if player.humanity < 85:
+            possible_buffs.append("humanity")
+        elif player.max_hp - player.hp > 20:
+            possible_buffs.append("heal")
+
+        out_msg = f"The {self.npc.name} chants in a low voice in a strange language. "
+        match random.choice(possible_buffs):
+            case "bless_res":
+                player.flags.blessed_revive += 1
+                return (
+                    out_msg
+                    + "You feel a surge of confidence, like someone is looking out for you!"
+                )
+            case "humanity":
+                # TODO
+                player.humanity += 15
+                return out_msg + "Your mind suddenly clears and you feel more focused!"
+            case "heal":
+                player.hp += 20
+                return (
+                    out_msg
+                    + "Some of your wounds miraculously stitch themselves together!"
+                )
+            case _ as another:
+                logger.error(
+                    f"{self.npc.name_str} attempted to bestow the following unhandled buff: {another}"
+                )
+                return f"{another} shouldnt be in possible buffs rip PLS REPORT THIS"
 
 
 class IntroConvo(Conversation):
@@ -106,7 +180,7 @@ class IntroConvo(Conversation):
             )
         elif self.stage == 4:
             return self.wrap_in_quotes(
-                "Oh, just so you know, you can type `leave` or `exit` to end most conversations."
+                "Oh, just so you know, you can type `leave` or `exit` to prematurely end most conversations."
             )
         elif self.stage == 5:
             return self.wrap_in_quotes("Anyway, take care!")
@@ -204,7 +278,7 @@ class RiddleConvo(Conversation):
             return (
                 self.wrap_in_quotes(quote)
                 + "\n"
-                + f"The {self.npc.name} steps aside to let you pass."
+                + f"The {self.npc.name_str} steps aside to let you pass."
             )
         elif self.answered_correctly:
             return self.wrap_in_quotes("No no, you had it before!")
