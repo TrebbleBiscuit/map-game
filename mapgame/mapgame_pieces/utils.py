@@ -27,6 +27,7 @@ COLOR_SCHEME = {
     "dialogue": "light_sky_blue1",
     "panel_stat_up": "medium_spring_green",
     "panel_stat_down": "hot_pink3",
+    "score": "bold green1",
 }
 
 

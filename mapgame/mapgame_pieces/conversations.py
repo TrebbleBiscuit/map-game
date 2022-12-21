@@ -131,13 +131,13 @@ class BuffConvo(Conversation):
         elif player.max_hp - player.hp > 20:
             possible_buffs.append("heal")
 
-        out_msg = f"The {self.npc.name} chants in a low voice in a strange language. "
+        out_msg = f"The {self.npc.name} chants in a low voice in a strange language."
         match random.choice(possible_buffs):
             case "bless_res":
                 player.flags.blessed_revive += 1
-                return (
-                    out_msg
-                    + "You feel a surge of confidence, like someone is looking out for you!"
+                return out_msg + color_string(
+                    "You feel a surge of confidence, like someone is looking out for you!",
+                    "good_thing_happened",
                 )
             case "humanity":
                 # TODO
@@ -148,15 +148,71 @@ class BuffConvo(Conversation):
                 )
             case "heal":
                 player.hp += 20
-                return (
-                    out_msg
-                    + "Some of your wounds miraculously stitch themselves together!"
+                return out_msg + color_string(
+                    "Some of your wounds miraculously stitch themselves together!",
+                    "good_thing_happened",
                 )
             case _ as another:
                 logger.error(
                     f"{self.npc.name_str} attempted to bestow the following unhandled buff: {another}"
                 )
                 return f"{another} shouldnt be in possible buffs rip PLS REPORT THIS"
+
+
+class CurseConvo(Conversation):
+    def __init__(self, npc):
+        super().__init__(npc)
+        self.given_curse = 0
+        self.can_leave = False
+
+    def prompt(self) -> str:
+        if self.given_curse == 0:
+            return self.wrap_in_quotes(
+                "Hello, traveler! You look like you could use a hand..."
+            )
+        else:
+            return self.wrap_in_quotes(
+                "Hah! That should 'help' you. Have fun out there."
+            )
+
+    def respond(self, player: "Player", to_say: str) -> str:
+        if to_say in LEAVE_OPTIONS or self.given_curse:
+            if self.exit_conversation():
+                if to_say in THANKS:
+                    bye = "...right. Later."
+                else:
+                    bye = "See ya."
+                return self.wrap_in_quotes(bye)
+            else:
+                return self.wrap_in_quotes("You can't escape my wrath!")
+
+        self.given_curse += 1
+        self.can_leave = True
+
+        possible_curses = ["curse_res"]
+        if player.humanity > 20:
+            possible_curses.append("humanity_down")
+
+        out_msg = f"The {self.npc.name} chants in a low voice in a strange language."
+        match random.choice(possible_curses):
+            case "curse_res":
+                player.flags.cursed_revive += 2
+                return out_msg + color_string(
+                    "You feel a surge of uneas, like malevalent forces are influencing you!",
+                    "humanity_down",
+                )
+            case "humanity_down":
+                # TODO
+                player.humanity -= 15
+                return out_msg + color_string(
+                    "Your mind feels scattered and you feel lightheaded!",
+                    "humanity_down",
+                )
+            case _ as another:
+                logger.error(
+                    f"{self.npc.name_str} attempted to inflict the following unhandled curse: {another}"
+                )
+                return f"{another} shouldnt be in possible curses rip PLS REPORT THIS"
 
 
 class IntroConvo(Conversation):

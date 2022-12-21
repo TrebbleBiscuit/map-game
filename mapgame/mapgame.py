@@ -178,7 +178,7 @@ class Game:
 
     def shoot_attack_hostiles(self):
         """you know like with a gun"""
-        base_dmg = 10 + int(0.8 * self.player.level)
+        base_dmg = 10 + self.player.level
         min_dmg = int((base_dmg * 0.5) + 0.5)
         max_dmg = int(base_dmg * 1.5)
         act_dmg = random.randint(min_dmg, max_dmg)
@@ -288,6 +288,13 @@ class Game:
             npc.take_damage(npc.hp)
         self.player.revive(cursed=True)
         self.gui.main_out.add_line(
+            color_string(
+                "You scream out in rage, and then everything goes black...",
+                "humanity_down",
+            )
+        )
+        self.gui.main_out.add_line("")
+        self.gui.main_out.add_line(
             "When you come to, there is nothing left of the hostiles but mutilated corpses. Was this your doing..?"
         )
         # todo: make any potential friendly npcs in the room wander away
@@ -340,22 +347,24 @@ class Game:
             self.player.tile_index = dim_num
         self.gui.main_out.add_line(f"You portal into dimension #{dim_num}")
         hostile_npc_count = len(
-            [x for x in self.current_tile.npcs if x.player_attitude <= 0]
+            [
+                x
+                for x in self.current_tile.npcs
+                if x.player_attitude <= 0 and not x.is_dead
+            ]
         )
-        if self.debug:
-            self.gui.main_out.add_line(
-                f"DEBUG: {hostile_npc_count} hostile NPCs remaining on this tile"
-            )
         if self.player.humanity < hostile_npc_count:
             self.player.humanity = 1
         else:
             self.player.humanity -= hostile_npc_count
         self.player.grant_xp(dim_num * 3 + random.randint(4, 10))
         self.current_tile = self.map.get_tile(dim_num)
-        self.player.save_to_file()
         self.player.x, self.player.y = (0, 0)
         if not self.player.tile_index % 5:
+            # we'll safe after exiting limbo
             self.enter_limbo()
+        else:
+            self.player.save_to_file()
 
     def maybe_encounter_npc(self):
         # Should we encounter an NPC?
@@ -405,12 +414,20 @@ class Game:
             )
         elif self.game_state == GameState.in_combat:
             for hostile in self.interaction.in_combat_vs:
-                enemy_text = color_string(f"{hostile.name.title()}", "hostile_name")
-                if hostile.level != hostile.tile_index:
-                    self.gui.main_out.add_line(f"DEBUG: Hostile level: {hostile.level}")
+                level_bonus_text = ""
+                if hostile.level != self.player.tile_index:
+                    level_bonus_text += "+" * (
+                        (hostile.level - self.player.tile_index) // 2
+                    )
+                enemy_text = color_string(
+                    f"{hostile.name.title()}{level_bonus_text}", "hostile_name"
+                )
                 # if self.debug:
+                hostile_hp_txt = color_string(
+                    f"({hostile.hp}/{hostile.max_hp} HP)", "dim"
+                )
                 self.gui.main_out.add_line(
-                    f"{enemy_text}: {hostile.hp_flavor} ({hostile.hp}/{hostile.max_hp} HP)",
+                    f"{enemy_text}: {hostile.hp_flavor} {hostile_hp_txt}",
                 )
             # self.gui.main_out.add_line(f"You: {self.player.hp}/{self.player.max_hp} HP")
             self.gui.main_out.add_line(
@@ -419,7 +436,7 @@ class Game:
             if self.player.inventory.get_item_qty("Bullet") > 0:
                 shoot_txt = color_string("shoot", "main_command")
                 self.gui.main_out.add_line(
-                    f"You can also try to {shoot_txt} an enemy ({self.player.gun_aiming}%)"
+                    f"You can also try to {shoot_txt} an enemy ({color_string(str(self.player.gun_aiming), 'dim')}%)"
                 )
         elif self.game_state == GameState.in_conversation:
             assert self.interaction.in_conversation_with
@@ -430,7 +447,7 @@ class Game:
                 "You exist in a state of limbo; a world between worlds."
             )
             self.gui.main_out.add_line(
-                f"You take a moment to reflect. Your current score is {color_string(self.player.score, )}"
+                f"You take a moment to reflect. Your current score is {color_string(self.player.score, 'score')}"
             )
             if self.player.humanity <= 90 and self.player.money >= 10:
                 self.gui.main_out.add_line(
@@ -439,7 +456,7 @@ class Game:
             if (
                 self.player.flags.humanity_warning_level
                 and self.player.humanity > 20
-                and not self.player.flags.cursed_revive
+                and self.player.flags.cursed_revive <= 2
             ):
                 self.gui.main_out.add_line("You could pray to the dark gods...")
             self.gui.main_out.add_line("You can continue onward to exit limbo")
@@ -472,7 +489,7 @@ class Game:
             command in ["pray"]
             and self.player.flags.humanity_warning_level
             and self.player.humanity > 20
-            and self.player.flags.cursed_revive
+            and self.player.flags.cursed_revive <= 2
         ):
             self.gui.main_out.add_line(
                 "Shaking off the feeling that this is a bad idea, you give in to the whispers in your head..."
@@ -616,7 +633,7 @@ class Game:
                 str({x.name: x.coordinates for x in self.current_tile.npcs})
             )
         elif self.debug and command == "armor":
-            armor_piece = ArmorPiece()
+            armor_piece = ArmorPiece(name="generic helmet", armor_amount=1)
             self.player.armor.equip(armor_piece, self.gui)
         else:
             self.gui.main_out.add_line(INVALID_INPUT_MSG)

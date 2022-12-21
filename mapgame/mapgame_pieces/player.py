@@ -34,18 +34,25 @@ class ArmorModifier(str, Enum):
 
 
 class ArmorPiece:
-    def __init__(self, saved=None):
-        self.armor_slot: ArmorSlot = ArmorSlot.head
-        self.armor_amount: int = 1
-        self.modifier: ArmorModifier = ArmorModifier.plain
-        self.name: str = "generic helmet"
+    def __init__(
+        self,
+        name: str = "generic armorpiece",
+        armor_slot: ArmorSlot = ArmorSlot.head,
+        armor_amount: int = 1,
+        modifier: ArmorModifier = ArmorModifier.plain,
+        saved: dict | None = None,
+    ):
+        self.name: str = name
+        self.armor_slot = armor_slot
+        self.armor_amount = armor_amount
+        self.modifier = modifier
 
         if saved:
             self.from_saved(saved)
 
     @property
     def name_str(self):
-        return self.modifier.name + " " + self.name
+        return self.modifier.name + " " + self.name + " " + f"(+{self.armor_amount})"
 
     def from_saved(self, saved):
         for key, val in saved.items():
@@ -203,6 +210,7 @@ class Player(LivingThing):
         self.xp = 0
         self._humanity = 100  # out of 100
         self.time = 0
+        self.tile_index = 1
         if SAVE_PATH.exists():
             self.load_from_file()
 
@@ -229,20 +237,19 @@ class Player(LivingThing):
         if val < 80 and warn_lvl == 0:
             self.flags.humanity_warning_level = 1
             warn_msg = "As you lose another part of your humanity, you begin to feel a benign sense of unease..."
-            self.gui.main_out.add_line(warn_msg)
+            self.gui.main_out.add_line(color_string(warn_msg, "humanity_down"))
         elif val < 60 and warn_lvl == 1:
             self.flags.humanity_warning_level = 2
             warn_msg = "As you lose more of your humanity, you begin to hear dark whispers at the edge of your focus..."
-            self.gui.main_out.add_line(warn_msg)
+            self.gui.main_out.add_line(color_string(warn_msg, "humanity_down"))
         elif val < 40 and warn_lvl == 2:
             self.flags.humanity_warning_level = 3
             warn_msg = "It is getting harder to ignore the whispers. To fight away the sense of hopeless despair..."
-            self.gui.main_out.add_line(warn_msg)
+            self.gui.main_out.add_line(color_string(warn_msg, "humanity_down"))
         elif val < 20 and warn_lvl == 3:
             self.flags.humanity_warning_level = 4
             warn_msg = "There is less and less human about you all the time... How much longer can you remain in control?"
-            self.gui.main_out.add_line(warn_msg)
-            self.gui.main_out.add_line("Right?")
+            self.gui.main_out.add_line(color_string(warn_msg, "humanity_down"))
 
         self._humanity = val
 
@@ -261,6 +268,7 @@ class Player(LivingThing):
             "tile_index": self.tile_index,
             "xp": self.xp,
             "humanity": self.humanity,
+            "time": self.time,
         }
         for object_to_save in ["abilities", "flags", "armor", "inventory"]:
             save_value = getattr(self, object_to_save).to_save()
@@ -376,19 +384,13 @@ class Player(LivingThing):
                 )
             )
         elif cursed:
-            self.gui.main_out.add_line(
-                color_string(
-                    "Suddenly an unholy feeling of cursed power overwhelms you!",
-                    "humanity_down",
-                )
+            malicious_power_txt = color_string(
+                "Suddenly an unholy feeling of cursed power overwhelms you!",
+                "humanity_down",
             )
             self.gui.main_out.add_line(
-                color_string(
-                    "You scream out in rage, and then everything goes black...",
-                    "humanity_down",
-                )
+                malicious_power_txt + " You feel refreshed, but at a great cost..."
             )
-            self.gui.main_out.add_line("")
         else:
             malicious_power_txt = color_string(
                 "Suddenly a feeling of malicious power overwhelms you!",
@@ -401,6 +403,12 @@ class Player(LivingThing):
 
     def take_damage(self, dmg: int) -> bool:
         """return True if you died"""
+        # each armor point has a 50% chance to mitigate dmg
+        for x in range(self.armor.armor_score):
+            if random.random() >= 0.5:
+                dmg -= 1
+        if dmg < 1:
+            dmg = 1
         ouch = random.choice(["Ouch", "Oof", "Owwie", "Yikes", "Oh no"])
         dmg_txt = color_string(f"You take {dmg} damage!", "damage_taken")
         self.gui.main_out.add_line(f"{ouch}! {dmg_txt}")

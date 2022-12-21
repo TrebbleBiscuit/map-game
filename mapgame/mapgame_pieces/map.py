@@ -10,6 +10,7 @@ from mapgame_pieces.conversations import (
     IntroConvo,
     WisdomConvo,
     BuffConvo,
+    CurseConvo,
 )
 from mapgame_pieces.utils import color_string, COLOR_SCHEME
 
@@ -58,48 +59,40 @@ class Tile:
 
     def add_hostile_npcs_to_tile(self, level: int):
         number_of_npcs = BASE_NPCS_PER_TILE + min(int(level / 6), 3)
-        self.npcs = [NPC.generate_from_level(level) for x in range(number_of_npcs)]
+        self.npcs = [NPC.hostile_from_level(level) for x in range(number_of_npcs)]
         for npc in self.npcs:
             npc.x, npc.y = self.gen_random_coordinates()
-            npc.tile_index = level
             logger.debug(f"NPC spawned at {(npc.x, npc.y)}")
 
-    def make_conversation(self, npc):
-
-        all_conversations = [
-            RiddleConvo(
-                npc,
-                riddle_text="What has four paws and rhymes with 'rat'?",
-                correct_answers=("cat", "rat"),
-            ),
-            IntroConvo(npc),
-            WisdomConvo(npc),
-            # WisdomConvo(
-            #     npc,
-            #     f"Before you arrived, there were {len(self.npcs)} living beings on this floor.",
-            # ),
-            BuffConvo(npc),
-        ]
-
-        return random.choice(all_conversations)
-
     def add_friendly_npc_to_tile(self, level: int):
-        adj = random.choice(["old", "young", "bald", "spirited", "steadfast", "calm"])
-        noun = random.choice(["man", "woman", "person", "human", "wanderer"])
-        f_npc = NPC.generate_from_level(level + 2)
-        f_npc.tile_index = level
-        f_npc.player_attitude = 1
-        f_npc.x, f_npc.y = self.gen_random_coordinates()
-        # if level == 1:
-        #     convo = IntroConvo(npc=f_npc)
-        convo = self.make_conversation(npc=f_npc)
+        npc = NPC.friendly_from_level(level)
+        npc.x, npc.y = self.gen_random_coordinates()
+        convo = self.make_conversation(npc=npc)
         if isinstance(convo, WisdomConvo):
             adj = "wise"
         elif isinstance(convo, IntroConvo):
             adj = "helpful"
-        f_npc.name = adj + " " + noun
-        f_npc.conversation = convo
-        self.npcs.append(f_npc)
+        elif isinstance(convo, CurseConvo):
+            adj = "mischievous"
+        npc.conversation = convo
+        self.npcs.append(npc)
+
+    def make_conversation(self, npc):
+        match random.randint(1, 5):
+            case 1:
+                return RiddleConvo(
+                    npc,
+                    riddle_text="What has four paws and rhymes with 'rat'?",
+                    correct_answers=("cat", "rat"),
+                )
+            case 2:
+                return IntroConvo(npc)
+            case 3:
+                return WisdomConvo(npc)
+            case 4:
+                return BuffConvo(npc)
+            case 5:
+                return CurseConvo(npc)
 
     def _starting_rooms(self) -> RoomMap:
         rooms = {}
@@ -140,9 +133,9 @@ class Tile:
             room_name = self.rooms[room_coords].name
             self.gui.main_out.add_line(f"You stand in the {room_name} room!")
             if room_name == "portal":
-                leave_txt = color_string(f"leave", "main_command")
+                portal_txt = color_string("portal", "main_command")
                 self.gui.main_out.add_line(
-                    f"You can {leave_txt} through the portal in this room.",
+                    f"You can leave through the {portal_txt} in this room.",
                 )
                 # TODO: cleared?
             elif room_name == "medbay":

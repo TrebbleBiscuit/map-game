@@ -15,7 +15,6 @@ class LivingThing:
         self.hp = self.max_hp
         self.x = 0
         self.y = 0
-        self.tile_index = 1
         self.luck = 0
         self.attack_power_base = 1
         self.level = 1
@@ -78,15 +77,17 @@ class NPC(LivingThing):
     @property
     def hp_flavor(self):
         ratio = self.hp / self.max_hp
+        if ratio == 1:
+            return "In perfect health"
         if ratio >= 0.9:
             return "In very good health"
-        elif ratio >= 0.7:
+        if ratio >= 0.7:
             return "In good health"
         if ratio >= 0.5:
-            return "Slight injuries"
+            return "Slightly injured"
         if ratio >= 0.3:
-            return "Significant injuries"
-        elif ratio >= 0.15:
+            return "Significantly injured"
+        if ratio >= 0.15:
             return "Critically injured"
         return "On the verge of death"
 
@@ -99,7 +100,7 @@ class NPC(LivingThing):
         return color_string(self.name, color)
 
     @classmethod
-    def generate_from_level(cls, level: int) -> "NPC":
+    def hostile_from_level(cls, level: int):
         adjs = [
             "spooky",
             "scary",
@@ -124,7 +125,6 @@ class NPC(LivingThing):
             "vagabond",
         ]
         name = random.choice(adjs) + " " + random.choice(nouns)
-        inst = cls(name)
         max_level = int(level * 1.25 + 2)
         if (
             name in ("evil villain", "wayward vagabond", "spooky skeleton")
@@ -133,10 +133,29 @@ class NPC(LivingThing):
             level += 1
         if random.random() < (0.04 * level):
             level += 1
+        if random.random() < (0.03 * level):
+            level += 1
         if random.random() < (0.02 * level):
             level += 1
+        if random.random() < (0.01 * level):
+            level += 1
+        level = min(level, max_level)
+        return cls._generate_from_level(name, level)
+
+    @classmethod
+    def friendly_from_level(cls, level: int):
+        adj = random.choice(["old", "young", "bald", "spirited", "steadfast", "calm"])
+        noun = random.choice(["man", "woman", "person", "human", "wanderer"])
+        name = adj + " " + noun
+        inst = cls._generate_from_level(name, level)
+        inst.player_attitude = 1
+        return inst
+
+    @classmethod
+    def _generate_from_level(cls, name: str, level: int) -> "NPC":
+        logger.info(f"Generating level {level} NPC {name}")
+        inst = cls(name)
         inst.level = level
-        logger.info(f"Generated level {level} enemy {name}")
         hp_base = random.randint(15, 20)
         hp_level_multi = random.uniform(4.5, 5.5)
         inst.max_hp = hp_base + int(level * hp_level_multi)
@@ -145,7 +164,7 @@ class NPC(LivingThing):
             0, random.randint(1, level)
         )
         inst.attack_power_base = level + attack_modifier
-        inst.xp_reward = inst.attack_power_base + int(inst.max_hp / 7)
+        inst.xp_reward = int(inst.attack_power_base * 0.9) + int(inst.max_hp / 8)
         # inst.attack_type = random.choice(['ranged', 'melee'])
 
         return inst

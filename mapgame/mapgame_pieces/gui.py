@@ -106,6 +106,7 @@ class GUIWrapper(App):
         if self.game.debug:
             stats += "\n"
             stats += make_15_chars_long(f"Score: {self.game.player.score}")
+            stats += make_15_chars_long(f"Time: {self.game.player.time}")
         self.stats_out.update(stats)
 
     async def on_input_submitted(self, message: Input.Submitted):
