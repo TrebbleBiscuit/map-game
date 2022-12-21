@@ -142,7 +142,10 @@ class BuffConvo(Conversation):
             case "humanity":
                 # TODO
                 player.humanity += 15
-                return out_msg + "Your mind suddenly clears and you feel more focused!"
+                return out_msg + color_string(
+                    "Your mind suddenly clears and you feel more focused!",
+                    "good_thing_happened",
+                )
             case "heal":
                 player.hp += 20
                 return (

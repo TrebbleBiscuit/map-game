@@ -17,11 +17,16 @@ class LivingThing:
         self.y = 0
         self.tile_index = 1
         self.luck = 0
-        self.attack_power = 1
+        self.attack_power_base = 1
+        self.level = 1
 
     def _heal_over_time(self):
         if self.hp < self.max_hp:
             self.hp += 1
+
+    @property
+    def attack_power(self) -> int:
+        return self.attack_power_base
 
     @property
     def coordinates(self) -> tuple[int, int]:
@@ -71,6 +76,21 @@ class NPC(LivingThing):
         self.conversation: Conversation | None = None
 
     @property
+    def hp_flavor(self):
+        ratio = self.hp / self.max_hp
+        if ratio >= 0.9:
+            return "In very good health"
+        elif ratio >= 0.7:
+            return "In good health"
+        if ratio >= 0.5:
+            return "Slight injuries"
+        if ratio >= 0.3:
+            return "Significant injuries"
+        elif ratio >= 0.15:
+            return "Critically injured"
+        return "On the verge of death"
+
+    @property
     def name_str(self):
         if self.player_attitude > 0:
             color = "friendly_name"
@@ -89,6 +109,8 @@ class NPC(LivingThing):
             "fearsome",
             "angry",
             "intimidating",
+            "wayward",
+            "evil",
         ]
         nouns = [
             "slime",
@@ -99,13 +121,22 @@ class NPC(LivingThing):
             "scoundrel",
             "villain",
             "miscreant",
+            "vagabond",
         ]
         name = random.choice(adjs) + " " + random.choice(nouns)
-        logger.info(f"Generating level {level} enemy {name}")
         inst = cls(name)
-        inst.tile_index = level
-        if random.random() < 0.2:
+        max_level = int(level * 1.25 + 2)
+        if (
+            name in ("evil villain", "wayward vagabond", "spooky skeleton")
+            or "dangerous" in name
+        ):
             level += 1
+        if random.random() < (0.04 * level):
+            level += 1
+        if random.random() < (0.02 * level):
+            level += 1
+        inst.level = level
+        logger.info(f"Generated level {level} enemy {name}")
         hp_base = random.randint(15, 20)
         hp_level_multi = random.uniform(4.5, 5.5)
         inst.max_hp = hp_base + int(level * hp_level_multi)
@@ -113,8 +144,8 @@ class NPC(LivingThing):
         attack_modifier = random.randint(1, 3) + random.randint(
             0, random.randint(1, level)
         )
-        inst.attack_power = level + attack_modifier
-        inst.xp_reward = inst.attack_power + int(inst.max_hp / 7)
+        inst.attack_power_base = level + attack_modifier
+        inst.xp_reward = inst.attack_power_base + int(inst.max_hp / 7)
         # inst.attack_type = random.choice(['ranged', 'melee'])
 
         return inst

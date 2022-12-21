@@ -64,13 +64,21 @@ class EquippedArmor:
         if saved:
             self.from_saved(saved)
 
-    def equip(self, to_equip: ArmorPiece):
-        slot = to_equip.armor_slot.name
-        already_equipped = getattr(self, slot)
+    def unequip(self, armor_slot: ArmorSlot, gui):
+        gui.main_out.add_line(
+            f"You remove the {getattr(self, armor_slot.name).name_str} from your {armor_slot.name}."
+        )
+        setattr(self, armor_slot.name, None)
+
+    def equip(self, to_equip: ArmorPiece, gui):
+        armor_slot = to_equip.armor_slot
+        already_equipped = getattr(self, armor_slot)
         if already_equipped:
-            # TODO: 'you remove the x you're already wearing'
-            ...
-        setattr(self, slot, to_equip)
+            self.unequip(to_equip.armor_slot, gui)
+        setattr(self, armor_slot.name, to_equip)
+        gui.main_out.add_line(
+            f"You cover your {armor_slot.name} with the {getattr(self, armor_slot.name).name_str}."
+        )
         # TODO: 'you equip the x'
 
     @property
@@ -83,7 +91,7 @@ class EquippedArmor:
         return total
 
     def to_save(self) -> dict:
-        return self.__dict__
+        return {k: val.__dict__ for k, val in self.__dict__.items() if val is not None}
 
     def from_saved(self, saved):
         for key, val in saved.items():
@@ -100,6 +108,9 @@ class Inventory:
             "Bullet": Item("Bullet"),
         }
         self._equipped: EquippedMap = {"melee": None, "ranged": None, "armor": None}
+
+    def to_save(self):
+        return self.contents
 
     @property
     def contents(self) -> InventoryContents:
@@ -163,6 +174,7 @@ class Flags:
         self.humanity_warning_level = 0
         self.blessed_revive = 0
         self.cursed_revive = 0
+        self.cursed_power = 0
 
         if saved:
             self.from_saved(saved)
@@ -181,10 +193,11 @@ class Player(LivingThing):
         self.gui = gui
         self.max_hp = 30
         self.hp = self.max_hp
-        self.attack_power = 4  # base melee damage
+        self.attack_power_base = 4  # base melee damage
         self.inventory = Inventory()
         self.abilities = Abilities()
         self.flags = Flags()
+        self.armor = EquippedArmor()
         self.money = 0
         self.level = 1
         self.xp = 0
@@ -192,6 +205,10 @@ class Player(LivingThing):
         self.time = 0
         if SAVE_PATH.exists():
             self.load_from_file()
+
+    @property
+    def attack_power(self):
+        return int(self.level * 0.8) + 4
 
     @property
     def humanity(self) -> int:
@@ -239,18 +256,41 @@ class Player(LivingThing):
         save_data = {
             "max_hp": self.max_hp,
             "hp": self.hp,
-            "attack_power": self.attack_power,
             "money": self.money,
             "level": self.level,
             "tile_index": self.tile_index,
             "xp": self.xp,
             "humanity": self.humanity,
-            "inventory_contents": self.inventory.contents,
-            "abilities": self.abilities.to_save(),
-            "flags": self.flags.to_save(),
         }
+        for object_to_save in ["abilities", "flags", "armor", "inventory"]:
+            save_value = getattr(self, object_to_save).to_save()
+            if save_value:
+                save_data[object_to_save] = save_value
         with open(SAVE_PATH, "w") as savefile:
             json.dump(save_data, savefile)
+
+    def load_from_file(self):
+        logger.debug("Loading save from %s", SAVE_PATH)
+        with open(SAVE_PATH) as savefile:
+            try:
+                save_data = json.load(savefile)
+            except json.decoder.JSONDecodeError as exc:
+                logger.error("Error decoding savefile; starting new game")
+                logger.exception(exc)
+                return
+        for entry, value in save_data.items():
+            if entry == "inventory":
+                self.inventory = Inventory(contents=value)
+            elif entry == "abilities":
+                self.abilities = Abilities(saved=value)
+            elif entry == "flags":
+                self.flags = Flags(saved=value)
+            elif entry == "armor":
+                self.armor = EquippedArmor(saved=value)
+            elif entry == "humanity":
+                self._humanity = value
+            else:
+                setattr(self, entry, value)
 
     @property
     def score(self):
@@ -263,40 +303,27 @@ class Player(LivingThing):
             + self.humanity
         )
 
-    def load_from_file(self):
-        logger.debug("Loading save from %s", SAVE_PATH)
-        with open(SAVE_PATH) as savefile:
-            try:
-                save_data = json.load(savefile)
-            except json.decoder.JSONDecodeError as exc:
-                logger.error("Error decoding savefile; starting new game")
-                logger.exception(exc)
-                return
-        for entry, value in save_data.items():
-            if entry == "inventory_contents":
-                self.inventory = Inventory(contents=value)
-            elif entry == "abilities":
-                self.abilities = Abilities(saved=value)
-            elif entry == "flags":
-                self.flags = Flags(saved=value)
-            elif entry == "humanity":
-                self._humanity = value
-            else:
-                setattr(self, entry, value)
-
     def grant_xp(self, xp: int):
-        xp_txt = color_string(f"{xp} XP!", "stat_up")
-        self.gui.main_out.add_line(f"You gained {xp_txt}")
+        xp_txt = color_string(f"{xp} XP", "stat_up")
+        self.gui.main_out.add_line(f"You gained {xp_txt}!")
         self.xp += xp
         if self.xp > (25 * pow(self.level, 1.3)):
             lvl_txt = color_string(f"You have leveled up!", "level_up")
             self.gui.main_out.add_line(lvl_txt)
             self.level += 1
-            self.attack_power += 1
             self.max_hp += 5
             self.hp += 5
-            buffs_txt = color_string("(+1 ATK, +5 Max HP)", "stat_up")
-            self.gui.main_out.add_line(f"You are now level {self.level}. {buffs_txt}")
+
+            # buff_txt = color_string("+5 Max HP", "stat_up")
+            # if self.level % 3 == 0:
+            #     # 1/3 of the time
+            #     buff_txt += ", " color_string("some other buff", "stat_up")
+            # else:
+            #     # 2/3 of the time
+            #     buff_txt += ", " + color_string("+1 ATK", "stat_up")
+            #     self.attack_power += 1
+
+            self.gui.main_out.add_line(f"You are now level {self.level}.")
 
             # heal up to ~15% health
             self.heal_up_to(int(self.max_hp / 6))
@@ -343,14 +370,23 @@ class Player(LivingThing):
             self.game_over()
         if blessed:
             self.gui.main_out.add_line(
-                "Suddenly a feeling of holy power overwhelms you! You feel refreshed and recovered!"
+                color_string(
+                    "Suddenly a feeling of holy power overwhelms you! You feel refreshed and recovered!",
+                    "good_thing_happened",
+                )
             )
         elif cursed:
             self.gui.main_out.add_line(
-                "Suddenly an unholy feeling of cursed power overwhelms you!"
+                color_string(
+                    "Suddenly an unholy feeling of cursed power overwhelms you!",
+                    "humanity_down",
+                )
             )
             self.gui.main_out.add_line(
-                "You scream out in rage, and then everything goes black..."
+                color_string(
+                    "You scream out in rage, and then everything goes black...",
+                    "humanity_down",
+                )
             )
             self.gui.main_out.add_line("")
         else:

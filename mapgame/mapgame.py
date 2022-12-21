@@ -3,7 +3,7 @@ import random
 from enum import Enum
 from dataclasses import dataclass, field
 
-from mapgame_pieces.player import Player
+from mapgame_pieces.player import Player, ArmorPiece
 from mapgame_pieces.alive import NPC
 from mapgame_pieces.map import Map
 from mapgame_pieces.utils import (
@@ -148,10 +148,8 @@ class Game:
             act_dmg = random.randint(min_dmg, max_dmg)
             self.gui.main_out.add_line(f"You take a swing at the {hostile.name_str}!")
             dmg_txt = color_string(f"{act_dmg} damage", "damage_done")
-            dmg_flavor = color_string(
-                self.get_dmg_flavor(act_dmg, min_dmg, base_dmg, max_dmg), "dim"
-            )
-            self.gui.main_out.add_line(f"You do {dmg_txt}! {dmg_flavor}")
+            dmg_flavor = self.get_dmg_flavor(act_dmg, min_dmg, base_dmg, max_dmg)
+            self.gui.main_out.add_line(f"You do {dmg_txt} - {dmg_flavor}")
             if self.debug:
                 self.gui.main_out.add_line(f"DEBUG: ({min_dmg}-{max_dmg} dmg)")
             if hostile.take_damage(act_dmg):
@@ -164,21 +162,23 @@ class Game:
                 self.player.humanity += 1
 
     def get_dmg_flavor(self, act_dmg, min_dmg, base_dmg, max_dmg):
-        if act_dmg == max_dmg:
-            flavor_txt = "A critical hit!!"
+        dmg_range = max_dmg - min_dmg
+        diff_from_base = base_dmg - act_dmg
+        if abs(diff_from_base) <= (dmg_range // 5):
+            flavor_txt = color_string("an average hit!", "grey78")
+        elif act_dmg == max_dmg:
+            flavor_txt = color_string("a critical hit!!", "wheat1")
         elif act_dmg > base_dmg:
-            flavor_txt = "A good hit!"
-        elif act_dmg == base_dmg:
-            flavor_txt = "An average hit!"
+            flavor_txt = color_string("a good hit!", "grey85")
         elif act_dmg == min_dmg:
-            flavor_txt = "A very weak hit!!"
+            flavor_txt = color_string("a very weak hit!!", "grey50")
         else:
-            flavor_txt = "A glancing hit!"
+            flavor_txt = color_string("a glancing hit!", "grey62")
         return flavor_txt
 
     def shoot_attack_hostiles(self):
         """you know like with a gun"""
-        base_dmg = 10 + self.player.level
+        base_dmg = 10 + int(0.8 * self.player.level)
         min_dmg = int((base_dmg * 0.5) + 0.5)
         max_dmg = int(base_dmg * 1.5)
         act_dmg = random.randint(min_dmg, max_dmg)
@@ -188,11 +188,9 @@ class Game:
             f"You aim at the {hostile.name_str} and pull the trigger!"
         )
         if hit:
-            dmg_flavor = color_string(
-                self.get_dmg_flavor(act_dmg, min_dmg, base_dmg, max_dmg), "dim"
-            )
+            dmg_flavor = self.get_dmg_flavor(act_dmg, min_dmg, base_dmg, max_dmg)
             dmg_txt = color_string(f"{act_dmg} damage", "damage_done")
-            self.gui.main_out.add_line(f"You do {dmg_txt}! {dmg_flavor}")
+            self.gui.main_out.add_line(f"You do {dmg_txt} - {dmg_flavor}")
             if self.debug:
                 self.gui.main_out.add_line(f"DEBUG: ({min_dmg}-{max_dmg} dmg)")
             if hostile.take_damage(act_dmg):
@@ -250,6 +248,7 @@ class Game:
         if not self.interaction.in_combat_vs:
             logger.info("Ending combat because all enemies are dead")
             self.end_combat()
+            self.maybe_encounter_npc()
             return
         for hostile in self.interaction.in_combat_vs:
             # make sure we're still in combat each turn
@@ -263,10 +262,7 @@ class Game:
         min_dmg = int((base_dmg * 0.7) + 0.5)
         max_dmg = int(base_dmg * 1.3)
         act_dmg = random.randint(min_dmg, max_dmg)
-        dmg_flavor = color_string(
-            self.get_dmg_flavor(act_dmg, min_dmg, base_dmg, max_dmg).lower(),
-            "dim",
-        )
+        dmg_flavor = self.get_dmg_flavor(act_dmg, min_dmg, base_dmg, max_dmg)
         self.gui.main_out.add_line(
             f"The {hostile.name_str} attacks you, scoring {dmg_flavor}"
         )
@@ -294,6 +290,7 @@ class Game:
         self.gui.main_out.add_line(
             "When you come to, there is nothing left of the hostiles but mutilated corpses. Was this your doing..?"
         )
+        # todo: make any potential friendly npcs in the room wander away
         self.end_combat()
 
     def get_chest_contents(self) -> tuple[str, int]:
@@ -342,11 +339,17 @@ class Game:
         else:
             self.player.tile_index = dim_num
         self.gui.main_out.add_line(f"You portal into dimension #{dim_num}")
-        if self.player.humanity > 5:
-            self.player.humanity -= 1
-        elif self.player.humanity > 1:
-            if random.random() == 0.5:
-                self.player.humanity -= 1
+        hostile_npc_count = len(
+            [x for x in self.current_tile.npcs if x.player_attitude <= 0]
+        )
+        if self.debug:
+            self.gui.main_out.add_line(
+                f"DEBUG: {hostile_npc_count} hostile NPCs remaining on this tile"
+            )
+        if self.player.humanity < hostile_npc_count:
+            self.player.humanity = 1
+        else:
+            self.player.humanity -= hostile_npc_count
         self.player.grant_xp(dim_num * 3 + random.randint(4, 10))
         self.current_tile = self.map.get_tile(dim_num)
         self.player.save_to_file()
@@ -354,7 +357,7 @@ class Game:
         if not self.player.tile_index % 5:
             self.enter_limbo()
 
-    def maybe_enter_combat(self):
+    def maybe_encounter_npc(self):
         # Should we encounter an NPC?
         attacking_npcs = []
         other_npcs = []
@@ -403,8 +406,11 @@ class Game:
         elif self.game_state == GameState.in_combat:
             for hostile in self.interaction.in_combat_vs:
                 enemy_text = color_string(f"{hostile.name.title()}", "hostile_name")
+                if hostile.level != hostile.tile_index:
+                    self.gui.main_out.add_line(f"DEBUG: Hostile level: {hostile.level}")
+                # if self.debug:
                 self.gui.main_out.add_line(
-                    f"{enemy_text}: {hostile.hp}/{hostile.max_hp} HP",
+                    f"{enemy_text}: {hostile.hp_flavor} ({hostile.hp}/{hostile.max_hp} HP)",
                 )
             # self.gui.main_out.add_line(f"You: {self.player.hp}/{self.player.max_hp} HP")
             self.gui.main_out.add_line(
@@ -485,7 +491,7 @@ class Game:
                 + color_string(" unclean", "humanity_down")
             )
             self.player.flags.cursed_revive += 4
-            self.player.attack_power += 1
+            self.player.flags.cursed_power += 1
 
     def get_current_room_name(self) -> str | None:
         """Return the name of the room the player is currently in"""
@@ -550,7 +556,7 @@ class Game:
                 self.player.recover_hp(int(self.player.max_hp * 0.75))
                 self._progress_time()
 
-        elif command in ["talk", "conversation", "speak"]:
+        elif command in ["talk", "conversation", "speak", "greet", "hello"]:
             friendly_npcs = [
                 x
                 for x in self.current_tile.npcs
@@ -609,10 +615,13 @@ class Game:
             self.gui.main_out.add_line(
                 str({x.name: x.coordinates for x in self.current_tile.npcs})
             )
+        elif self.debug and command == "armor":
+            armor_piece = ArmorPiece()
+            self.player.armor.equip(armor_piece, self.gui)
         else:
             self.gui.main_out.add_line(INVALID_INPUT_MSG)
         # after that, check to see if we're in combat
-        self.maybe_enter_combat()
+        self.maybe_encounter_npc()
 
     def play(self, command: str) -> bool | None:
         """Route input to where it needs to go depending on current game state

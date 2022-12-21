@@ -61,6 +61,7 @@ class Tile:
         self.npcs = [NPC.generate_from_level(level) for x in range(number_of_npcs)]
         for npc in self.npcs:
             npc.x, npc.y = self.gen_random_coordinates()
+            npc.tile_index = level
             logger.debug(f"NPC spawned at {(npc.x, npc.y)}")
 
     def make_conversation(self, npc):
@@ -86,6 +87,7 @@ class Tile:
         adj = random.choice(["old", "young", "bald", "spirited", "steadfast", "calm"])
         noun = random.choice(["man", "woman", "person", "human", "wanderer"])
         f_npc = NPC.generate_from_level(level + 2)
+        f_npc.tile_index = level
         f_npc.player_attitude = 1
         f_npc.x, f_npc.y = self.gen_random_coordinates()
         # if level == 1:
