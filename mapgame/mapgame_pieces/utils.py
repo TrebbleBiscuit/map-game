@@ -28,6 +28,8 @@ COLOR_SCHEME = {
     "panel_stat_up": "medium_spring_green",
     "panel_stat_down": "hot_pink3",
     "score": "bold green1",
+    "armor_name": "deep_sky_blue1",
+    "entire_armor_str": "underline",
 }
 
 

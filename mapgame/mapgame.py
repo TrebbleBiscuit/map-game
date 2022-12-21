@@ -3,7 +3,7 @@ import random
 from enum import Enum
 from dataclasses import dataclass, field
 
-from mapgame_pieces.player import Player, ArmorPiece
+from mapgame_pieces.player import Player, ArmorPiece, ArmorSlot
 from mapgame_pieces.alive import NPC
 from mapgame_pieces.map import Map
 from mapgame_pieces.utils import (
@@ -300,21 +300,21 @@ class Game:
         # todo: make any potential friendly npcs in the room wander away
         self.end_combat()
 
-    def get_chest_contents(self) -> tuple[str, int]:
-        choices = [
-            ("Bullet", random.randint(3, int(self.player.tile_index / 2) + 3)),
-            (
-                "money",
-                random.randint(
-                    self.player.tile_index + 2, (self.player.tile_index + 2) * 2
-                ),
-            ),
-        ]
-        return random.choice(choices)
+    def get_chest_contents(self) -> tuple[str | ArmorPiece, int]:
+        match random.randint(1, 3):
+            case 1:
+                return "Bullet", random.randint(3, int(self.player.tile_index / 2) + 3)
+            case 2:
+                min_money = int(self.player.tile_index * 1.2) + 3
+                max_money = int(self.player.tile_index * 2) + 3
+                return "money", random.randint(min_money, max_money)
+            case 3:
+                return ArmorPiece.random_from_level(self.player.tile_index), 1
 
-    def open_chest(self):
+    def open_chest(self, debug=False):
         # here's the real stuff
-        self.current_tile.chests.remove(self.player.coordinates)
+        if not debug:
+            self.current_tile.chests.remove(self.player.coordinates)
         item_in_chest, qty_in_chest = self.get_chest_contents()
         if item_in_chest == "money":
             inside_txt = color_string(f"${qty_in_chest}", "got_item")
@@ -322,6 +322,18 @@ class Game:
                 f"You open a chest - there is {inside_txt} inside!"
             )
             self.player.money += qty_in_chest
+            return
+        elif isinstance(item_in_chest, ArmorPiece):
+            self.gui.main_out.add_line(
+                f"You open a chest - there is a {item_in_chest.name_str} inside!"
+            )
+            worn_armor = getattr(self.player.armor, item_in_chest.armor_slot.name)
+            if not worn_armor or item_in_chest.armor_amount > worn_armor.armor_amount:
+                self.player.armor.equip(item_in_chest, self.gui)
+            else:
+                self.gui.main_out.add_line(
+                    f"It's not better than your {item_in_chest.name_str} though."
+                )
             return
         self.player.inventory.add(item_in_chest, qty_in_chest)
         # here's user feedback
@@ -629,12 +641,42 @@ class Game:
             else:
                 self.gui.main_out.add_line("off-map coordinates not allowed")
         elif self.debug and command == "npc":
+            self.gui.main_out.add_line("hihi~")
             self.gui.main_out.add_line(
                 str({x.name: x.coordinates for x in self.current_tile.npcs})
             )
-        elif self.debug and command == "armor":
-            armor_piece = ArmorPiece(name="generic helmet", armor_amount=1)
-            self.player.armor.equip(armor_piece, self.gui)
+        elif self.debug and command == "armor me up":
+            armor_pieces = [
+                ArmorPiece(
+                    name="spawned helmet",
+                    armor_slot=ArmorSlot.head,
+                    armor_amount=1,
+                ),
+                ArmorPiece(
+                    name="spawned chestplate",
+                    armor_slot=ArmorSlot.chest,
+                    armor_amount=1,
+                ),
+                ArmorPiece(
+                    name="spawned leggings",
+                    armor_slot=ArmorSlot.legs,
+                    armor_amount=1,
+                ),
+                ArmorPiece(
+                    name="spawned boots",
+                    armor_slot=ArmorSlot.feet,
+                    armor_amount=1,
+                ),
+            ]
+            for armor_piece in armor_pieces:
+                self.gui.main_out.add_line("okok~")
+                self.player.armor.equip(armor_piece, self.gui)
+        elif self.debug and command == "ggwp":
+            self.gui.main_out.add_line("ezpz~")
+            self.player.game_over()
+        elif self.debug and command == "treasure chest":
+            self.gui.main_out.add_line("tada~")
+            self.open_chest(debug=True)
         else:
             self.gui.main_out.add_line(INVALID_INPUT_MSG)
         # after that, check to see if we're in combat

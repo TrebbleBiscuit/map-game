@@ -190,15 +190,15 @@ class CurseConvo(Conversation):
         self.can_leave = True
 
         possible_curses = ["curse_res"]
-        if player.humanity > 20:
+        if player.humanity > 30:
             possible_curses.append("humanity_down")
 
-        out_msg = f"The {self.npc.name} chants in a low voice in a strange language."
+        out_msg = f"The {self.npc.name} chants in a low voice in a strange language. "
         match random.choice(possible_curses):
             case "curse_res":
                 player.flags.cursed_revive += 2
                 return out_msg + color_string(
-                    "You feel a surge of uneas, like malevalent forces are influencing you!",
+                    "You feel a surge of unease, like malevalent forces are influencing you!",
                     "humanity_down",
                 )
             case "humanity_down":

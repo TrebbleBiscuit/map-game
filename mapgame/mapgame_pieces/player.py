@@ -28,21 +28,22 @@ class ArmorSlot(str, Enum):
 
 
 class ArmorModifier(str, Enum):
-    plain = "plain"
+
     blessed = "blessed"
+    plain = "plain"
     cursed = "cursed"
 
 
 class ArmorPiece:
     def __init__(
         self,
-        name: str = "generic armorpiece",
+        name: str | None = None,
         armor_slot: ArmorSlot = ArmorSlot.head,
         armor_amount: int = 1,
         modifier: ArmorModifier = ArmorModifier.plain,
         saved: dict | None = None,
     ):
-        self.name: str = name
+        self.name: str = name if name else self.generate_name(armor_slot)
         self.armor_slot = armor_slot
         self.armor_amount = armor_amount
         self.modifier = modifier
@@ -52,7 +53,50 @@ class ArmorPiece:
 
     @property
     def name_str(self):
-        return self.modifier.name + " " + self.name + " " + f"(+{self.armor_amount})"
+        if self.modifier == ArmorModifier.plain:
+            modifier_str = ""
+        else:
+            modifier_str = self.modifier.name + " "
+        flavor_adj_map = {
+            0: color_string("useless ", "grey39"),
+            1: color_string("damaged ", "grey50"),
+            2: color_string("tattered ", "grey62"),
+            3: color_string("worn ", "grey78"),
+            4: "",
+            5: color_string("solid ", "cornsilk1"),
+            6: color_string("strong ", "wheat1"),
+            7: color_string("powerful ", "khaki1"),
+        }
+        flavor_adj = flavor_adj_map[min(7, self.armor_amount)]
+        return color_string(
+            modifier_str
+            + flavor_adj
+            + color_string(self.name, "armor_name")
+            + " "
+            + f"(+{self.armor_amount})",
+            "entire_armor_str",
+        )
+
+    @staticmethod
+    def generate_name(armor_slot: ArmorSlot) -> str:
+        match armor_slot:
+            case ArmorSlot.head:
+                return random.choice(["helmet", "helm", "headgear"])
+            case ArmorSlot.chest:
+                return random.choice(["chestplate", "chestpiece"])
+            case ArmorSlot.legs:
+                return random.choice(["leggings", "pants"])
+            case ArmorSlot.feet:
+                return random.choice(["boots", "shoes"])
+            case _:
+                raise ValueError(f"armor_slot is not valid: {armor_slot}")
+
+    @classmethod
+    def random_from_level(cls, level: int):
+        armor_slot = random.choice([x for x in ArmorSlot])
+        armor_amount = random.randint(level // 5, level // 2)
+        inst = cls(armor_slot=armor_slot, armor_amount=armor_amount)
+        return inst
 
     def from_saved(self, saved):
         for key, val in saved.items():
@@ -346,16 +390,17 @@ class Player(LivingThing):
 
     def game_over(self):
         logger.info(f"GAME OVER - Score: {self.score}")
-        self.gui.main_out.add_line("Your humanity drops to zero!")
+        self.gui.main_out.add_line("\nYour humanity drops to zero!")
         self.gui.main_out.add_line(
             "No longer will you rise to fight the endless hoard of monsters."
         )
         self.gui.main_out.add_line("Instead you are doomed to wander among them.")
-        self.gui.main_out.add_line("    GAME OVER    ")
+        self.gui.main_out.add_line("\n" + color_string("GAME OVER", "bold underline"))
         self.gui.main_out.add_line(f"Your final score is {self.score}")
         self.gui.main_out.add_line(
             "delete your save file if you want, or just keep playing"
         )
+        self.gui.main_out.add_line("")
 
     def revive(self, cursed=False, blessed=False):
         if not blessed and self.flags.blessed_revive:

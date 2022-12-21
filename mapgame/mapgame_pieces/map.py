@@ -69,11 +69,11 @@ class Tile:
         npc.x, npc.y = self.gen_random_coordinates()
         convo = self.make_conversation(npc=npc)
         if isinstance(convo, WisdomConvo):
-            adj = "wise"
+            npc.name = "wise " + npc.name
         elif isinstance(convo, IntroConvo):
-            adj = "helpful"
+            npc.name = "helpful " + npc.name
         elif isinstance(convo, CurseConvo):
-            adj = "mischievous"
+            npc.name = "mischievous " + npc.name
         npc.conversation = convo
         self.npcs.append(npc)
 
