@@ -15,13 +15,17 @@ class LivingThing:
         self.hp = self.max_hp
         self.x = 0
         self.y = 0
-        self.tile_index = 1
         self.luck = 0
-        self.attack_power = 1
+        self.attack_power_base = 1
+        self.level = 1
 
     def _heal_over_time(self):
         if self.hp < self.max_hp:
             self.hp += 1
+
+    @property
+    def attack_power(self) -> int:
+        return self.attack_power_base
 
     @property
     def coordinates(self) -> tuple[int, int]:
@@ -71,6 +75,23 @@ class NPC(LivingThing):
         self.conversation: Conversation | None = None
 
     @property
+    def hp_flavor(self):
+        ratio = self.hp / self.max_hp
+        if ratio == 1:
+            return "In perfect health"
+        if ratio >= 0.9:
+            return "In very good health"
+        if ratio >= 0.7:
+            return "In good health"
+        if ratio >= 0.5:
+            return "Slightly injured"
+        if ratio >= 0.3:
+            return "Significantly injured"
+        if ratio >= 0.15:
+            return "Critically injured"
+        return "On the verge of death"
+
+    @property
     def name_str(self):
         if self.player_attitude > 0:
             color = "friendly_name"
@@ -79,7 +100,7 @@ class NPC(LivingThing):
         return color_string(self.name, color)
 
     @classmethod
-    def generate_from_level(cls, level: int) -> "NPC":
+    def hostile_from_level(cls, level: int):
         adjs = [
             "spooky",
             "scary",
@@ -89,6 +110,8 @@ class NPC(LivingThing):
             "fearsome",
             "angry",
             "intimidating",
+            "wayward",
+            "evil",
         ]
         nouns = [
             "slime",
@@ -99,13 +122,40 @@ class NPC(LivingThing):
             "scoundrel",
             "villain",
             "miscreant",
+            "vagabond",
         ]
         name = random.choice(adjs) + " " + random.choice(nouns)
-        logger.info(f"Generating level {level} enemy {name}")
-        inst = cls(name)
-        inst.tile_index = level
-        if random.random() < 0.2:
+        max_level = int(level * 1.25 + 2)
+        if (
+            name in ("evil villain", "wayward vagabond", "spooky skeleton")
+            or "dangerous" in name
+        ):
             level += 1
+        if random.random() < (0.04 * level):
+            level += 1
+        if random.random() < (0.03 * level):
+            level += 1
+        if random.random() < (0.02 * level):
+            level += 1
+        if random.random() < (0.01 * level):
+            level += 1
+        level = min(level, max_level)
+        return cls._generate_from_level(name, level)
+
+    @classmethod
+    def friendly_from_level(cls, level: int):
+        adj = random.choice(["old", "young", "bald", "spirited", "steadfast", "calm"])
+        noun = random.choice(["man", "woman", "person", "human", "wanderer"])
+        name = adj + " " + noun
+        inst = cls._generate_from_level(name, level)
+        inst.player_attitude = 1
+        return inst
+
+    @classmethod
+    def _generate_from_level(cls, name: str, level: int) -> "NPC":
+        logger.info(f"Generating level {level} NPC {name}")
+        inst = cls(name)
+        inst.level = level
         hp_base = random.randint(15, 20)
         hp_level_multi = random.uniform(4.5, 5.5)
         inst.max_hp = hp_base + int(level * hp_level_multi)
@@ -113,8 +163,8 @@ class NPC(LivingThing):
         attack_modifier = random.randint(1, 3) + random.randint(
             0, random.randint(1, level)
         )
-        inst.attack_power = level + attack_modifier
-        inst.xp_reward = inst.attack_power + int(inst.max_hp / 7)
+        inst.attack_power_base = level + attack_modifier
+        inst.xp_reward = int(inst.attack_power_base * 0.9) + int(inst.max_hp / 8)
         # inst.attack_type = random.choice(['ranged', 'melee'])
 
         return inst

@@ -15,20 +15,25 @@ COLOR_SCHEME = {
     "secondary_command": "deep_sky_blue3",
     "hostile_name": "medium_orchid",
     "friendly_name": "bold white",
-    "damage_done": "dark_red",
+    "damage_done": "deep_pink4",
     "damage_taken": "bright_red",
     "got_item": "bright_cyan",
     "humanity_down": "deep_pink3",
     "level_up": "bold green1",
-    "stat_up": "gold1",
-    "good_thing_happened": "gold3",
+    "stat_up": "underline gold1",
+    "good_thing_happened": "light_goldenrod1",
     "dim": "bright_black",
     "recover_hp": "green",
-    "dialogue": "light_sky_blue1"
+    "dialogue": "light_sky_blue1",
+    "panel_stat_up": "medium_spring_green",
+    "panel_stat_down": "hot_pink3",
+    "score": "bold green1",
+    "armor_name": "deep_sky_blue1",
+    "entire_armor_str": "underline",
 }
 
 
-def color_string(string, color):
+def color_string(string: str, color: str):
     """Return a string with color tags"""
     try:
         tag = COLOR_SCHEME[color]
