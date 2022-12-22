@@ -35,7 +35,7 @@ class GUIWrapper(App):
         self.game = game
 
     def compose(self) -> ComposeResult:
-        yield Header()
+        # yield Header()
         # yield Footer()
         yield self.map_out
         yield self.main_out
