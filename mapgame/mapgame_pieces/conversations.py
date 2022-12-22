@@ -131,7 +131,7 @@ class BuffConvo(Conversation):
         elif player.max_hp - player.hp > 20:
             possible_buffs.append("heal")
 
-        out_msg = f"The {self.npc.name} chants in a low voice in a strange language."
+        out_msg = f"The {self.npc.name} chants in a low voice in a strange language. "
         match random.choice(possible_buffs):
             case "bless_res":
                 player.flags.blessed_revive += 1

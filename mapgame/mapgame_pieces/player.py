@@ -28,9 +28,7 @@ class ArmorSlot(str, Enum):
 
 
 class ArmorModifier(str, Enum):
-
     blessed = "blessed"
-    plain = "plain"
     cursed = "cursed"
 
 
@@ -40,7 +38,7 @@ class ArmorPiece:
         name: str | None = None,
         armor_slot: ArmorSlot = ArmorSlot.head,
         armor_amount: int = 1,
-        modifier: ArmorModifier = ArmorModifier.plain,
+        modifier: ArmorModifier | None = None,
         saved: dict | None = None,
     ):
         self.name: str = name if name else self.generate_name(armor_slot)
@@ -51,9 +49,12 @@ class ArmorPiece:
         if saved:
             self.from_saved(saved)
 
+    def to_save(self) -> dict:
+        return {k: val for k, val in self.__dict__.items() if val is not None}
+
     @property
     def name_str(self):
-        if self.modifier == ArmorModifier.plain:
+        if self.modifier is None:
             modifier_str = ""
         else:
             modifier_str = self.modifier.name + " "
@@ -142,7 +143,7 @@ class EquippedArmor:
         return total
 
     def to_save(self) -> dict:
-        return {k: val.__dict__ for k, val in self.__dict__.items() if val is not None}
+        return {k: val.to_save() for k, val in self.__dict__.items() if val is not None}
 
     def from_saved(self, saved):
         for key, val in saved.items():
@@ -260,7 +261,10 @@ class Player(LivingThing):
 
     @property
     def attack_power(self):
-        return int(self.level * 0.8) + 4
+        power = (self.level * 0.8) + 4
+        if self.flags.cursed_power:
+            power *= 1.1**self.flags.cursed_power
+        return int(power)
 
     @property
     def humanity(self) -> int:

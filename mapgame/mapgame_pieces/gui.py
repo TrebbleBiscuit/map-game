@@ -43,6 +43,9 @@ class GUIWrapper(App):
         yield self.main_in
 
     def on_mount(self):
+        self.main_out.add_line(
+            color_string("Welcome to mapgame!", "bold medium_spring_green")
+        )
         map_now = markup.escape(
             self.game.current_tile.get_map(self.game.player.x, self.game.player.y)
         )

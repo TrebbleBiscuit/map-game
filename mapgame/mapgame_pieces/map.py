@@ -57,6 +57,11 @@ class Tile:
         self.add_hostile_npcs_to_tile(level)
         self.add_friendly_npc_to_tile(level)
 
+    def get_npc_threats(self):
+        return [
+            npc for npc in self.npcs if npc.player_attitude <= 0 and not npc.is_dead
+        ]
+
     def add_hostile_npcs_to_tile(self, level: int):
         number_of_npcs = BASE_NPCS_PER_TILE + min(int(level / 6), 3)
         self.npcs = [NPC.hostile_from_level(level) for x in range(number_of_npcs)]

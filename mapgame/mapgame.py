@@ -358,13 +358,7 @@ class Game:
         else:
             self.player.tile_index = dim_num
         self.gui.main_out.add_line(f"You portal into dimension #{dim_num}")
-        hostile_npc_count = len(
-            [
-                x
-                for x in self.current_tile.npcs
-                if x.player_attitude <= 0 and not x.is_dead
-            ]
-        )
+        hostile_npc_count = len(self.current_tile.get_npc_threats())
         if self.player.humanity < hostile_npc_count:
             self.player.humanity = 1
         else:
@@ -395,7 +389,7 @@ class Game:
             if conversation_npcs:
                 convo_npc = random.choice(conversation_npcs)
                 self.gui.main_out.add_line(
-                    f"The friendly {convo_npc.name_str} in this room strikes up a conversation with you!"
+                    f"The {convo_npc.name_str} in this room strikes up a conversation with you!"
                 )
                 self.enter_conversation(convo_npc)
 
@@ -668,8 +662,8 @@ class Game:
                     armor_amount=1,
                 ),
             ]
+            self.gui.main_out.add_line("okok~")
             for armor_piece in armor_pieces:
-                self.gui.main_out.add_line("okok~")
                 self.player.armor.equip(armor_piece, self.gui)
         elif self.debug and command == "ggwp":
             self.gui.main_out.add_line("ezpz~")
