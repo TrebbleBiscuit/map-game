@@ -10,6 +10,18 @@ def get_plural_suffix(word: str):
     return "s"
 
 
+def coordinates_from_direction(orig_coordinates: tuple[int, int], direction: str):
+    match direction:
+        case "north":
+            return orig_coordinates[0], orig_coordinates[1] - 1
+        case "east":
+            return orig_coordinates[0] + 1, orig_coordinates[1]
+        case "south":
+            return orig_coordinates[0], orig_coordinates[1] + 1
+        case "west":
+            return orig_coordinates[0] - 1, orig_coordinates[1]
+
+
 COLOR_SCHEME = {
     "main_command": "deep_sky_blue1",
     "secondary_command": "deep_sky_blue3",

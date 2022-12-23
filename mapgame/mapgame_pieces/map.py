@@ -13,6 +13,7 @@ from mapgame_pieces.conversations import (
     CurseConvo,
 )
 from mapgame_pieces.utils import color_string, COLOR_SCHEME
+from rich import markup
 
 logger = logging.getLogger(__name__)
 BASE_NPCS_PER_TILE = 7
@@ -58,9 +59,7 @@ class Tile:
         self.add_friendly_npc_to_tile(level)
 
     def get_npc_threats(self):
-        return [
-            npc for npc in self.npcs if npc.player_attitude <= 0 and not npc.is_dead
-        ]
+        return [npc for npc in self.npcs if npc.will_attack_player()]
 
     def add_hostile_npcs_to_tile(self, level: int):
         number_of_npcs = BASE_NPCS_PER_TILE + min(int(level / 6), 3)
@@ -272,7 +271,8 @@ class Tile:
                 valid_choice = rc
         return valid_choice
 
-    def _path_when_moving(self, x: int, y: int, direction):
+    @staticmethod
+    def _path_when_moving(x: int, y: int, direction):
         if direction == "n":
             return ((x, y - 1), (x, y))
         elif direction == "s":
@@ -323,7 +323,7 @@ class Tile:
                 else:
                     mapstr += "   "
             mapstr += "\n"
-        return mapstr
+        return markup.escape(mapstr)
 
 
 class Map:

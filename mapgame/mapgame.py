@@ -10,6 +10,7 @@ from mapgame_pieces.utils import (
     color_string,
     sanitize_input,
     get_plural_suffix,
+    coordinates_from_direction,
     COLOR_SCHEME,
 )
 from mapgame_pieces.gui import GUIWrapper
@@ -64,9 +65,11 @@ class Game:
                     self.player.coordinates == npc.coordinates
                     and npc.will_attack_player()
                 ):
-                    self.gui.main_out.add_line(
-                        f"An enemy {npc.name_str} is already in this room!"
-                    )
+                    # redundant; player should already know they're moving into a
+                    # room with a hostile npc because of self.npc_nearby_room_flavor()
+                    # self.gui.main_out.add_line(
+                    #     f"An enemy {npc.name_str} is already in this room!"
+                    # )
                     continue
                 npc_action = npc._on_time_pass(self.current_tile)
 
@@ -112,6 +115,9 @@ class Game:
         if random.random() < 0.2:
             gui_choices.append("I N T E R D I M E N S I O N A L   L I M B O")
         self.gui.main_out.add_line("You feel yourself enter interdimensional limbo!")
+        self.gui.main_out.add_line(
+            f"You take a moment to reflect. Your current score is {color_string(str(self.player.score), 'score')}"
+        )
         self.gui.main_in.placeholder = random.choice(gui_choices)
         self.game_state = GameState.in_limbo
 
@@ -447,12 +453,24 @@ class Game:
                 )
                 self.enter_conversation(convo_npc)
 
+    def move_options_short_str(self) -> str:
+        x, y = self.player.coordinates
+        valid_dirs = []
+        for direction in ("north", "east", "south", "west"):
+            if self.current_tile.check_move(x, y, direction[0]):
+                valid_dirs.append(direction)
+        if len(valid_dirs) <= 2:
+            return f"({'/'.join([x for x in valid_dirs])})"
+        else:
+            return f"({'/'.join([x[0] for x in valid_dirs])})"
+
     def turn_prompt(self):
         """Prompt the user to enter a command"""
         # self.stdscr.clrtobot()
         self.gui.update_stats()
         if self.game_state == GameState.in_map:
             self.current_tile.room_flavor_text(self.player.coordinates)
+            self.npc_nearby_room_flavor()
             if self.player.coordinates in self.current_tile.chests:
                 open_txt = color_string("open", "main_command")
                 self.gui.main_out.add_line(
@@ -470,7 +488,7 @@ class Game:
                         )
             self.gui.main_out.add_line(
                 "What direction do you want to move? "
-                + color_string("(n/e/s/w)", "dim")
+                + color_string(self.move_options_short_str(), "dim")
             )
         elif self.game_state == GameState.in_combat:
             for hostile in self.interaction.in_combat_vs:
@@ -505,9 +523,6 @@ class Game:
         elif self.game_state == GameState.in_limbo:
             self.gui.main_out.add_line(
                 "You exist in a state of limbo; a world between worlds."
-            )
-            self.gui.main_out.add_line(
-                f"You take a moment to reflect. Your current score is {color_string(self.player.score, 'score')}"
             )
             if self.player.humanity <= 90 and self.player.money >= 10:
                 self.gui.main_out.add_line(
@@ -574,6 +589,19 @@ class Game:
         """Return the name of the room the player is currently in"""
         if self.player.coordinates in self.current_tile.rooms:
             return self.current_tile.rooms[self.player.coordinates].name
+
+    def npc_nearby_room_flavor(self):
+        x, y = self.player.coordinates
+        coordinate_map = {
+            coordinates_from_direction(self.player.coordinates, direction): direction
+            for direction in ["north", "east", "south", "west"]
+            if self.current_tile.check_move(x, y, direction[0])
+        }
+        for npc in self.current_tile.get_npc_threats():
+            if npc.coordinates in coordinate_map:
+                self.gui.main_out.add_line(
+                    f"There is a {npc.name_str} to the {coordinate_map[npc.coordinates]}."
+                )
 
     def map_turn(self, command: str) -> bool | None:
         """Process a user's input command"""

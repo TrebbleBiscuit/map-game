@@ -1,4 +1,3 @@
-from rich import markup
 from textual.app import App, ComposeResult
 from textual.widgets import Header, Static, Input, TextLog
 from rich.text import Text
@@ -46,23 +45,26 @@ class GUIWrapper(App):
         self.main_out.add_line(
             color_string("Welcome to mapgame!", "bold medium_spring_green")
         )
-        map_now = markup.escape(
-            self.game.current_tile.get_map(self.game.player.x, self.game.player.y)
-        )
-        self.map_out.update(map_now)
+        map_now = self.game.current_tile.get_map(self.game.player.x, self.game.player.y)
+        colored_map = color_string(map_now, self.map_color_from_level())
+        self.map_out.update(colored_map)
         self.update_stats()
         self.game.turn_prompt()
 
-    def update_map(self):
-        # escape markup so that `[n]` stays that way instead of disappearing
+    def map_color_from_level(self) -> str:
+        # range: 160 to 195
+        red = min(250, self.game.player.tile_index * 10)
+        blue = 250 - red
+        green = 250 - red
+        return f"rgb({red},{green},{blue})"
 
+    def update_map(self):
         if self.game.game_state.value != 1:  # in_map
             self.map_out.update(self.game.game_state.name.replace("_", " "))
             return
-        map_now = markup.escape(
-            self.game.current_tile.get_map(self.game.player.x, self.game.player.y)
-        )
-        self.map_out.update(map_now)
+        map_now = self.game.current_tile.get_map(self.game.player.x, self.game.player.y)
+        colored_map = color_string(map_now, self.map_color_from_level())
+        self.map_out.update(colored_map)
 
     def color_stat_up_or_down(self, text: str, diff: int):
         if diff > 0:
