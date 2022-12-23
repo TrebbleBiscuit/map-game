@@ -31,6 +31,7 @@ COLOR_SCHEME = {
     "armor_name": "deep_sky_blue1",
     "entire_armor_str": "underline",
     "cursed": "bold red1",
+    "bad_thing_happened": "hot_pink3",
 }
 
 
