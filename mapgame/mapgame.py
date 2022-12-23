@@ -50,11 +50,56 @@ class Game:
         self.gui.run()
 
     def _progress_time(self):
-        if random.randint(1, 6) == 1:
+        if random.randint(1, 6) == 1 and self.game_state == GameState.in_map:
             self.player._heal_over_time()
         self.player.time += 1
         for npc in self.current_tile.npcs:
-            npc._on_time_pass(self.current_tile)
+            if (
+                npc not in self.interaction.in_combat_vs
+                and npc != self.interaction.in_conversation_with
+            ):
+                previous_coordinates = npc.coordinates
+                # hostile npcs in the same room as the player should not wander away
+                if (
+                    self.player.coordinates == npc.coordinates
+                    and npc.will_attack_player()
+                ):
+                    self.gui.main_out.add_line(
+                        f"An enemy {npc.name_str} is already in this room!"
+                    )
+                    continue
+                npc_action = npc._on_time_pass(self.current_tile)
+
+                if npc_action and npc.coordinates == self.player.coordinates:
+                    self._npc_entered_player_tile(npc, npc_action)
+                elif npc_action and previous_coordinates == self.player.coordinates:
+                    self._npc_left_player_tile(npc, npc_action)
+
+    def _npc_left_player_tile(self, npc, direction):
+        self.gui.main_out.add_line(f"The {npc.name_str} heads {direction}")
+
+    def _npc_entered_player_tile(self, npc, direction):
+        """If a hostile npc shows up while in combat, add it to the fray.
+        Make note of any other NPCs walking into the room at any time."""
+        if npc.will_attack_player():
+            if self.game_state == GameState.in_combat:
+                new_enemy_txt = color_string(
+                    f"An enemy {npc.name_str} wanders in from the {direction} and joins the fray!",
+                    "bad_thing_happened",
+                )
+                self.gui.main_out.add_line("\n" + new_enemy_txt)
+                self.interaction.in_combat_vs.append(npc)
+            else:
+                assert self.game_state == GameState.in_map
+                new_combat_txt = color_string(
+                    f"An enemy {npc.name_str} wanders in from the {direction} and immediately attacks!",
+                    "bad_thing_happened",
+                )
+                self.gui.main_out.add_line(new_combat_txt)
+        else:
+            self.gui.main_out.add_line(
+                f"An {npc.name_str} wanders in from the {direction}."
+            )
 
     def enter_limbo(self):
         gui_choices = [
@@ -238,6 +283,7 @@ class Game:
                 out_of_combat.append(hostile)
                 self.player.grant_xp(hostile.xp_reward)
                 self.player.grant_money(random.randint(1, hostile.xp_reward))
+                self.current_tile.npcs.remove(hostile)
             elif hostile.player_attitude > 0:
                 out_of_combat.append(hostile)
                 logger.info(f"{hostile.name} exits combat because attitude is high")
@@ -255,6 +301,7 @@ class Game:
             if self.game_state != GameState.in_combat:
                 return
             self.hostile_combat_turn(hostile)
+        self._progress_time()
         self.gui.main_out.add_line("")
 
     def hostile_combat_turn(self, hostile: NPC):
@@ -286,11 +333,18 @@ class Game:
         """
         for npc in self.interaction.in_combat_vs:
             npc.take_damage(npc.hp)
+            self.current_tile.npcs.remove(npc)
         self.player.revive(cursed=True)
         self.gui.main_out.add_line(
             color_string(
-                "You scream out in rage, and then everything goes black...",
+                "The whispers swell in volume until you can't ignore them any longer!",
                 "humanity_down",
+            )
+        )
+        self.gui.main_out.add_line(
+            color_string(
+                "You scream out in rage, and then everything goes black...",
+                "cursed",
             )
         )
         self.gui.main_out.add_line("")
@@ -442,7 +496,7 @@ class Game:
             if self.player.inventory.get_item_qty("Bullet") > 0:
                 shoot_txt = color_string("shoot", "main_command")
                 self.gui.main_out.add_line(
-                    f"You can also try to {shoot_txt} an enemy ({color_string(str(self.player.gun_aiming), 'dim')}%)"
+                    f"You can also try to {shoot_txt} an enemy {color_string('('+str(self.player.gun_aiming)+ '%)', 'dim')}"
                 )
         elif self.game_state == GameState.in_conversation:
             assert self.interaction.in_conversation_with
@@ -537,9 +591,7 @@ class Game:
                     # heal when entering new rooms
                     self.player._heal_over_time()
                 self.current_tile.explored.add(self.player.coordinates)
-                # self.current_tile.room_flavor_text(self.player.coordinates)
                 self._progress_time()
-                # TODO: print flavor text for room
             else:
                 self.gui.main_out.add_line("You can't move that way.")
         elif self.get_current_room_name() == "portal" and command in [

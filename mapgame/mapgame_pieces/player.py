@@ -95,7 +95,7 @@ class ArmorPiece:
     @classmethod
     def random_from_level(cls, level: int):
         armor_slot = random.choice([x for x in ArmorSlot])
-        armor_amount = random.randint(level // 5, level // 2)
+        armor_amount = random.randint(max(1, level // 5), max(1, level // 2))
         inst = cls(armor_slot=armor_slot, armor_amount=armor_amount)
         return inst
 
@@ -399,7 +399,7 @@ class Player(LivingThing):
             "No longer will you rise to fight the endless hoard of monsters."
         )
         self.gui.main_out.add_line("Instead you are doomed to wander among them.")
-        self.gui.main_out.add_line("\n" + color_string("GAME OVER", "bold underline"))
+        self.gui.main_out.add_line("\n" + color_string("GAME OVER", "cursed"))
         self.gui.main_out.add_line(f"Your final score is {self.score}")
         self.gui.main_out.add_line(
             "delete your save file if you want, or just keep playing"
@@ -434,7 +434,7 @@ class Player(LivingThing):
             )
         elif cursed:
             malicious_power_txt = color_string(
-                "Suddenly an unholy feeling of cursed power overwhelms you!",
+                f"Suddenly an unholy feeling of {color_string('cursed', 'cursed')} power overwhelms you!",
                 "humanity_down",
             )
             self.gui.main_out.add_line(

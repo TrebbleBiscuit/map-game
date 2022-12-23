@@ -181,13 +181,14 @@ class NPC(LivingThing):
             tile.chests.remove((self.x, self.y))
             self.max_hp = int(self.max_hp * 1.09)
         elif self.wander:
-            if random.random() < 0.4:
+            if random.random() < 0.5:
                 # chance to not wander
                 return
             move_options = ["n", "s", "e", "w"]
             random.shuffle(move_options)
             mv_choice = move_options.pop()
-            while not self.move(tile, mv_choice):  # try to move until it works
+            move = None
+            while not move:  # try to move until it works
                 try:
                     mv_choice = move_options.pop()
                 except IndexError:
@@ -195,6 +196,8 @@ class NPC(LivingThing):
                         f"NPC at {(self.x, self.y)} could not find a location to wander to!"
                     )
                     return False
+                move = self.move(tile, mv_choice)
+            return move
 
     def take_damage(self, dmg: int) -> bool:
         """deal `dmg` damage. return True if hostile is dead"""

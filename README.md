@@ -30,7 +30,8 @@ Or: `python mapgame/mapgame.py`
 ##### Tips
 
 - If your HP drops to zero, you'll get most of it back - at the cost of some humanity
-- Restore humanity by leveling up and entering the portal
+- Restore humanity by leveling up and killing enemies
 - You heal 1 HP every time you enter an unexplored room
+- You lose humanity when going through the portal depening on the number of remaining hostile NPCs
 - Enemies that get to a chest before you will steal its loot and get stronger
 - If you `run` from combat, you lose nothing but your pride
