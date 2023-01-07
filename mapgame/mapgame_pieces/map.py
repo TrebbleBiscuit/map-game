@@ -349,7 +349,7 @@ class Map:
         self.default_height = height
         self.default_width = width
         self.gui = gui
-        self.tiles = [self.get_tile(1)]  # ordered list
+        self.tiles = []  # ordered list
 
     def get_tile(self, level: int) -> Tile:
         """Generate a tile with NPCs at a particular level"""
