@@ -133,7 +133,7 @@ class BuffConvo(Conversation):
 
         good_adj = random.choice(["strange", "unknown", "peculiar", "unfamiliar"])
         out_msg = (
-            f"The {self.npc.name} chants in a low voice in a {good_adj} language. "
+            f"The {self.npc.name} chants in a low voice in a {good_adj} language.\n"
         )
         match random.choice(possible_buffs):
             case "bless_res":
@@ -200,7 +200,9 @@ class CurseConvo(Conversation):
             random.choice(["malevolent", "uncanny", "eerie", "twisted"]),
             "humanity_down",
         )
-        out_msg = f"The {self.npc.name} chants in a low voice in a {bad_adj} language! "
+        out_msg = (
+            f"The {self.npc.name} chants in a low voice in a {bad_adj} language!\n"
+        )
         match random.choice(possible_curses):
             case "curse_res":
                 player.flags.cursed_revive += 2

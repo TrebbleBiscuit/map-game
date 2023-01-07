@@ -137,6 +137,24 @@ class Tile:
             room_name = self.rooms[room_coords].name
             self.gui.main_out.add_line(f"You stand in the {room_name} room!")
             if room_name == "portal":
+                match len(self.get_npc_threats()):
+                    case 0:
+                        portal_flavor_txt = color_string(
+                            "a soothing golden light.", "wheat1"
+                        )
+                    case 1 | 2:
+                        portal_flavor_txt = color_string(
+                            "a passive yellow light.", "yellow3"
+                        )
+                    case 3 | 4:
+                        portal_flavor_txt = color_string(
+                            "an unsettling orange light.", "dark_orange3"
+                        )
+                    case _:
+                        portal_flavor_txt = color_string(
+                            "a dangerous red light.", "red1"
+                        )
+                self.gui.main_out.add_line("It glows with " + portal_flavor_txt)
                 portal_txt = color_string("portal", "main_command")
                 self.gui.main_out.add_line(
                     f"You can leave through the {portal_txt} in this room.",
