@@ -66,7 +66,7 @@ class Game:
                     and npc.will_attack_player()
                 ):
                     # redundant; player should already know they're moving into a
-                    # room with a hostile npc because of self.npc_nearby_room_flavor()
+                    # room with a hostile npc because of self.nearby_room_flavor()
                     # self.gui.main_out.add_line(
                     #     f"An enemy {npc.name_str} is already in this room!"
                     # )
@@ -114,7 +114,9 @@ class Game:
         ]
         if random.random() < 0.2:
             gui_choices.append("I N T E R D I M E N S I O N A L   L I M B O")
-        self.gui.main_out.add_line("You feel yourself enter interdimensional limbo!")
+        self.gui.main_out.add_line(
+            color_string("You feel yourself enter interdimensional limbo!", "in_limbo")
+        )
         self.gui.main_out.add_line(
             f"You take a moment to reflect. Your current score is {color_string(str(self.player.score), 'score')}"
         )
@@ -198,9 +200,9 @@ class Game:
         for hostile in self.interaction.in_combat_vs:
             act_dmg = random.randint(min_dmg, max_dmg)
             self.gui.main_out.add_line(f"You take a swing at the {hostile.name_str}!")
-            dmg_txt = color_string(f"{act_dmg} damage", "damage_done")
+            dmg_txt = color_string(f"You do {act_dmg} damage", "damage_done")
             dmg_flavor = self.get_dmg_flavor(act_dmg, min_dmg, base_dmg, max_dmg)
-            self.gui.main_out.add_line(f"You do {dmg_txt} - {dmg_flavor}")
+            self.gui.main_out.add_line(f"{dmg_txt} - {dmg_flavor}")
             if self.debug:
                 self.gui.main_out.add_line(f"DEBUG: ({min_dmg}-{max_dmg} dmg)")
             if hostile.take_damage(act_dmg):
@@ -254,34 +256,38 @@ class Game:
 
     def combat(self, ui: str):
         assert len(self.interaction.in_combat_vs) > 0
-        if ui in ["melee", "m"]:
-            self.melee_attack_hostiles()
-        elif ui in ["shoot", "s"]:
-            bullet_qty = self.player.inventory.get_item_qty("Bullet")
-            if bullet_qty:
-                if bullet_qty > 1:
-                    self.gui.main_out.add_line(
-                        f"You decide to use one of your {bullet_qty} bullets."
-                    )
+        match ui:
+            case "melee" | "m":
+                self.melee_attack_hostiles()
+            case "shoot" | "s":
+                bullet_qty = self.player.inventory.get_item_qty("Bullet")
+                if bullet_qty:
+                    if bullet_qty > 1:
+                        self.gui.main_out.add_line(
+                            f"You decide to use one of your {bullet_qty} bullets."
+                        )
+                    else:
+                        self.gui.main_out.add_line(
+                            "You decide to use your last bullet."
+                        )
+                    self.player.inventory.remove("Bullet")
+                    self.shoot_attack_hostiles()
                 else:
-                    self.gui.main_out.add_line("You decide to use your last bullet.")
-                self.player.inventory.remove("Bullet")
-                self.shoot_attack_hostiles()
-            else:
-                self.gui.main_out.add_line("You don't have any ammo!")
+                    self.gui.main_out.add_line("You don't have any ammo!")
+                    return
+            case "run" | "r":
+                success_chance = 0.7 + (self.player.level / 100)
+                success_chance = min(success_chance, 100)
+                if random.random() < success_chance:
+                    self.gui.main_out.add_line("You run away!")
+                    self.end_combat()
+                    return
+                self.gui.main_out.add_line(
+                    f"You try to run away ({int(success_chance*100)}%), but aren't quick enough this time!"
+                )
+            case _:
+                self.gui.main_out.add_line(INVALID_INPUT_MSG)
                 return
-        elif ui in ["run", "r"]:
-            success_chance = 0.8
-            if random.random() < success_chance:
-                self.gui.main_out.add_line("You run away!")
-                self.end_combat()
-                return
-            self.gui.main_out.add_line(
-                f"You try to run away ({int(success_chance*100)}%), but aren't quick enough this time!"
-            )
-        else:
-            self.gui.main_out.add_line(INVALID_INPUT_MSG)
-            return
         # if any hostiles are dead, give xp and update list of hostiles
         out_of_combat = []
         for hostile in self.interaction.in_combat_vs:
@@ -366,7 +372,7 @@ class Game:
                 return "Bullet", random.randint(3, int(self.player.tile_index / 2) + 3)
             case 2:
                 min_money = int(self.player.tile_index * 1.2) + 3
-                max_money = int(self.player.tile_index * 2) + 3
+                max_money = int(self.player.tile_index * 2) + 8
                 return "money", random.randint(min_money, max_money)
             case 3:
                 return ArmorPiece.random_from_level(self.player.tile_index), 1
@@ -470,11 +476,16 @@ class Game:
         self.gui.update_stats()
         if self.game_state == GameState.in_map:
             self.current_tile.room_flavor_text(self.player.coordinates)
-            self.npc_nearby_room_flavor()
+            self.nearby_room_flavor()
             if self.player.coordinates in self.current_tile.chests:
-                open_txt = color_string("open", "main_command")
+                look_a_chest = color_string(
+                    "There's a chest in this room!",
+                    "light_goldenrod1",
+                )
+                chest_flavor = "It emits a glowing golden light."
+                open_txt = color_string("Open", "main_command")
                 self.gui.main_out.add_line(
-                    f"There's a chest in this room! {open_txt} it to see what's inside."
+                    f"{look_a_chest} {chest_flavor} {open_txt} it to see what's inside."
                 )
             for ct_npc in self.current_tile.npcs:
                 if not ct_npc.is_dead and ct_npc.coordinates == self.player.coordinates:
@@ -533,7 +544,9 @@ class Game:
                 and self.player.humanity > 20
                 and self.player.flags.cursed_revive <= 2
             ):
-                self.gui.main_out.add_line("You could pray to the dark gods...")
+                self.gui.main_out.add_line(
+                    color_string("You could pray to the dark gods...", "humanity_down")
+                )
             self.gui.main_out.add_line("You can continue onward to exit limbo")
         else:
             raise ValueError(f"Invalid Game State '{self.game_state}'")
@@ -590,7 +603,7 @@ class Game:
         if self.player.coordinates in self.current_tile.rooms:
             return self.current_tile.rooms[self.player.coordinates].name
 
-    def npc_nearby_room_flavor(self):
+    def nearby_room_flavor(self):
         x, y = self.player.coordinates
         coordinate_map = {
             coordinates_from_direction(self.player.coordinates, direction): direction
@@ -601,6 +614,12 @@ class Game:
             if npc.coordinates in coordinate_map:
                 self.gui.main_out.add_line(
                     f"There is a {npc.name_str} to the {coordinate_map[npc.coordinates]}."
+                )
+        for chest_coords in self.current_tile.chests:
+            if chest_coords in coordinate_map:
+                glow_txt = color_string("faint glowing light", "good_thing_maybe")
+                self.gui.main_out.add_line(
+                    f"You see a {glow_txt} to the {coordinate_map[chest_coords]}."
                 )
 
     def map_turn(self, command: str) -> bool | None:

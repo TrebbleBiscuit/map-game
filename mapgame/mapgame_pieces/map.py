@@ -12,7 +12,7 @@ from mapgame_pieces.conversations import (
     BuffConvo,
     CurseConvo,
 )
-from mapgame_pieces.utils import color_string, COLOR_SCHEME
+from mapgame_pieces.utils import color_string
 from rich import markup
 
 logger = logging.getLogger(__name__)
@@ -71,7 +71,7 @@ class Tile:
     def add_friendly_npc_to_tile(self, level: int):
         npc = NPC.friendly_from_level(level)
         npc.x, npc.y = self.gen_random_coordinates()
-        convo = self.make_conversation(npc=npc)
+        convo = self.make_conversation(npc=npc, level=level)
         if isinstance(convo, WisdomConvo):
             npc.name = "wise " + npc.name
         elif isinstance(convo, IntroConvo):
@@ -81,21 +81,21 @@ class Tile:
         npc.conversation = convo
         self.npcs.append(npc)
 
-    def make_conversation(self, npc):
-        match random.randint(1, 5):
+    def make_conversation(self, npc, level):
+        if level == 1:
+            return IntroConvo(npc)
+        match random.randint(1, 7):
             case 1:
                 return RiddleConvo(
                     npc,
                     riddle_text="What has four paws and rhymes with 'rat'?",
                     correct_answers=("cat", "rat"),
                 )
-            case 2:
-                return IntroConvo(npc)
-            case 3:
+            case 2 | 3:
                 return WisdomConvo(npc)
-            case 4:
+            case 4 | 5:
                 return BuffConvo(npc)
-            case 5:
+            case 6 | 7:
                 return CurseConvo(npc)
 
     def _starting_rooms(self) -> RoomMap:
@@ -152,7 +152,7 @@ class Tile:
                 color_string("You stand in an empty room.", "dim")
             )
 
-    def generate_paths(self, n_paths: int):
+    def generate_paths(self, n_paths: int) -> list[tuple[Coordinates, Coordinates]]:
         paths = []
         logger.info(f"Generating {n_paths} paths")
         n_attempts = 0

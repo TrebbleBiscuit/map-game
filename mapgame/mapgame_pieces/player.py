@@ -70,11 +70,8 @@ class ArmorPiece:
         }
         flavor_adj = flavor_adj_map[min(7, self.armor_amount)]
         return color_string(
-            modifier_str
-            + flavor_adj
-            + color_string(self.name, "armor_name")
-            + " "
-            + f"(+{self.armor_amount})",
+            #  + " " + f"(+{self.armor_amount})"
+            modifier_str + flavor_adj + color_string(self.name, "armor_name"),
             "entire_armor_str",
         )
 

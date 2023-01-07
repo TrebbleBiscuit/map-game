@@ -27,13 +27,14 @@ COLOR_SCHEME = {
     "secondary_command": "deep_sky_blue3",
     "hostile_name": "medium_orchid",
     "friendly_name": "bold white",
-    "damage_done": "deep_pink4",
+    "damage_done": "dark_goldenrod",
     "damage_taken": "bright_red",
     "got_item": "bright_cyan",
     "humanity_down": "deep_pink3",
     "level_up": "bold green1",
     "stat_up": "underline gold1",
     "good_thing_happened": "light_goldenrod1",
+    "good_thing_maybe": "wheat1",
     "dim": "bright_black",
     "recover_hp": "green",
     "dialogue": "light_sky_blue1",
@@ -44,6 +45,7 @@ COLOR_SCHEME = {
     "entire_armor_str": "underline",
     "cursed": "bold red1",
     "bad_thing_happened": "hot_pink3",
+    "in_limbo": "purple",
 }
 
 
