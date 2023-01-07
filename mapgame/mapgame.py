@@ -701,6 +701,17 @@ class Game:
             else:
                 self.gui.main_out.add_line(INVALID_INPUT_MSG)
                 return
+        elif command in ["armor"]:
+            no_armor = True
+            for slot in ArmorSlot:
+                in_slot = getattr(self.player.armor, slot)
+                if in_slot:
+                    no_armor = False
+                    self.gui.main_out.add_line(
+                        f"You're wearing {in_slot.name_str} on your {slot.name}."
+                    )
+            if no_armor:
+                self.gui.main_out.add_line("You aren't wearing any armor.")
         # beyond here lies debug commands
         # elif self.debug and command[:2] == "ff":
         #     self.combat(ct_npc)
